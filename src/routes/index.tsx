@@ -1,13 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Phone, MapPin, Calendar, MessageCircle, Star, ShieldCheck, Users, Award,
   Droplet, Disc3, Gauge, Wrench, Activity, Snowflake, Car, Truck, Bus,
-  CheckCircle2, ArrowRight, Sparkles, Clock, Tag,
+  CheckCircle2, ArrowRight, Sparkles, Clock, Tag, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
+} from "@/components/ui/select";
 import heroShop from "@/assets/hero-shop.jpg";
 
 export const Route = createFileRoute("/")({
