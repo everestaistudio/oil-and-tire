@@ -1,13 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Phone, MapPin, Calendar, MessageCircle, Star, ShieldCheck, Users, Award,
   Droplet, Disc3, Gauge, Wrench, Activity, Snowflake, Car, Truck, Bus,
-  CheckCircle2, ArrowRight, Sparkles, Clock, Tag,
+  CheckCircle2, ArrowRight, Sparkles, Clock, Tag, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
+} from "@/components/ui/select";
 import heroShop from "@/assets/hero-shop.jpg";
 
 export const Route = createFileRoute("/")({
@@ -209,83 +212,223 @@ function Reviews() {
 }
 
 /* ---------------- Health Checker ---------------- */
+const MAKES = [
+  "Toyota", "Honda", "Ford", "Chevrolet", "Hyundai", "Kia",
+  "Nissan", "Subaru", "BMW", "Mercedes-Benz", "Audi", "Volkswagen",
+  "Mazda", "Jeep", "RAM", "GMC",
+];
+
+const YEARS = Array.from({ length: 17 }, (_, i) => String(2010 + i));
+
+interface ServiceRec {
+  name: string;
+  intervalKm: number;
+  icon: React.ReactNode;
+}
+
+const SERVICES: ServiceRec[] = [
+  { name: "Oil Change", intervalKm: 5000, icon: <Droplet className="h-4 w-4 text-electric shrink-0" /> },
+  { name: "Tire Rotation", intervalKm: 8000, icon: <Disc3 className="h-4 w-4 text-electric shrink-0" /> },
+  { name: "Brake Inspection", intervalKm: 15000, icon: <Gauge className="h-4 w-4 text-electric shrink-0" /> },
+  { name: "Fluid Check", intervalKm: 10000, icon: <Activity className="h-4 w-4 text-electric shrink-0" /> },
+  { name: "Multi-Point Inspection", intervalKm: 20000, icon: <Wrench className="h-4 w-4 text-electric shrink-0" /> },
+];
+
+function getServiceStatus(mileage: number, intervalKm: number) {
+  const remaining = intervalKm - (mileage % intervalKm);
+  if (remaining <= 1000) return { label: "Due soon", color: "text-neon" };
+  if (remaining <= 3000) return { label: "Recommended", color: "text-electric" };
+  return { label: "Upcoming", color: "text-muted-foreground" };
+}
+
 function HealthChecker() {
+  const [make, setMake] = useState("");
+  const [model, setModel] = useState("");
+  const [year, setYear] = useState("");
+  const [mileage, setMileage] = useState("");
+  const [checked, setChecked] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const resultRef = useRef<HTMLDivElement>(null);
+
+  const numMileage = Number(mileage);
+  const canCheck = make && model.trim() && year && mileage && numMileage >= 0;
+
+  const handleCheck = () => {
+    if (!canCheck) return;
+    setChecked(false);
+    setScanning(true);
+    setTimeout(() => {
+      setScanning(false);
+      setChecked(true);
+      setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+    }, 1500);
+  };
+
+  const oilRemaining = 5000 - (numMileage % 5000);
+  const oilProgress = Math.min(100, Math.max(0, ((numMileage % 5000) / 5000) * 100));
+
   return (
-    <section className="py-16 sm:py-24">
+    <section className="py-16 sm:py-24" id="health-checker">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
-        <SectionHead eyebrow="Smart diagnostics" title={<>VEHICLE <span className="text-electric">HEALTH</span> CHECKER</>} subtitle="Tell us about your ride. We'll tell you what's next." />
+        <SectionHead
+          eyebrow="Smart diagnostics"
+          title={<>VEHICLE <span className="text-electric">HEALTH</span> CHECKER</>}
+          subtitle="Tell us about your ride. We'll tell you what's next."
+        />
         <div className="mt-10 grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6">
           {/* Form */}
-          <form className="rounded-2xl border border-border bg-surface p-6 sm:p-7 space-y-4" style={{ boxShadow: "var(--shadow-card)" }}>
+          <div className="rounded-2xl border border-border bg-surface p-6 sm:p-7 space-y-4" style={{ boxShadow: "var(--shadow-card)" }}>
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Make"><SelectShell placeholder="Select Make" /></Field>
-              <Field label="Model"><SelectShell placeholder="Select Model" /></Field>
-              <Field label="Year"><Input type="number" placeholder="2021" className="bg-background/60 border-border h-11" /></Field>
-              <Field label="Current Mileage"><Input type="number" placeholder="48,500 km" className="bg-background/60 border-border h-11" /></Field>
+              <div>
+                <Label className="text-xs uppercase tracking-widest text-muted-foreground mb-1.5 block">Make</Label>
+                <Select value={make} onValueChange={setMake}>
+                  <SelectTrigger className="h-11 bg-background/60 border-border">
+                    <SelectValue placeholder="Select Make" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MAKES.map((m) => (
+                      <SelectItem key={m} value={m}>{m}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs uppercase tracking-widest text-muted-foreground mb-1.5 block">Model</Label>
+                <Input
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  placeholder="e.g. Civic"
+                  className="bg-background/60 border-border h-11"
+                />
+              </div>
+              <div>
+                <Label className="text-xs uppercase tracking-widest text-muted-foreground mb-1.5 block">Year</Label>
+                <Select value={year} onValueChange={setYear}>
+                  <SelectTrigger className="h-11 bg-background/60 border-border">
+                    <SelectValue placeholder="Select Year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {YEARS.map((y) => (
+                      <SelectItem key={y} value={y}>{y}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs uppercase tracking-widest text-muted-foreground mb-1.5 block">Current Mileage (km)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={mileage}
+                  onChange={(e) => setMileage(e.target.value)}
+                  placeholder="48,500"
+                  className="bg-background/60 border-border h-11"
+                />
+              </div>
             </div>
-            <Button type="button" variant="neon" size="xl" className="w-full gap-2">
-              <Sparkles className="h-5 w-5" /> Check My Vehicle
+            <Button
+              onClick={handleCheck}
+              disabled={!canCheck || scanning}
+              variant="neon"
+              size="xl"
+              className="w-full gap-2"
+            >
+              {scanning ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" /> Analyzing…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-5 w-5" /> Check My Vehicle
+                </>
+              )}
             </Button>
-            <p className="text-xs text-muted-foreground text-center">Free service report · no commitment</p>
-          </form>
+            <p className="text-xs text-muted-foreground text-center">Free service report · no commitment · demo only</p>
+          </div>
 
-          {/* Dashboard */}
-          <div className="relative rounded-2xl border border-electric/30 bg-surface p-6 sm:p-7 overflow-hidden" style={{ boxShadow: "var(--shadow-electric)" }}>
+          {/* Result Card */}
+          <div
+            ref={resultRef}
+            className={`relative rounded-2xl border bg-surface p-6 sm:p-7 overflow-hidden transition-all duration-500 ${
+              checked ? "border-electric/30 opacity-100 translate-y-0" : "border-border opacity-60"
+            }`}
+            style={{ boxShadow: checked ? "var(--shadow-electric)" : "var(--shadow-card)" }}
+          >
             <div className="absolute inset-0 bg-grid opacity-30" />
-            <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-electric to-transparent animate-scan" />
+            {checked && (
+              <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-electric to-transparent animate-scan" />
+            )}
             <div className="relative">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] uppercase tracking-widest text-electric font-semibold">Live Report</span>
-                <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-neon">
-                  <span className="h-1.5 w-1.5 rounded-full bg-neon animate-pulse-glow" /> Healthy
+                <span className="text-[10px] uppercase tracking-widest text-electric font-semibold">
+                  {checked ? "Live Report" : "Preview"}
                 </span>
+                {checked ? (
+                  <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-neon">
+                    <span className="h-1.5 w-1.5 rounded-full bg-neon animate-pulse-glow" /> Healthy
+                  </span>
+                ) : (
+                  <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                    Fill form to generate report
+                  </span>
+                )}
               </div>
-              <div className="mt-5">
-                <div className="text-xs text-muted-foreground uppercase tracking-wider">Your next oil change in</div>
-                <div className="mt-1 font-display font-black text-5xl sm:text-6xl">
-                  3,500 <span className="text-electric text-2xl sm:text-3xl">km</span>
+
+              {checked && (
+                <div className="mt-5">
+                  <div className="text-xs text-muted-foreground uppercase tracking-wider">
+                    Your vehicle may be due for an oil change in
+                  </div>
+                  <div className="mt-1 font-display font-black text-5xl sm:text-6xl">
+                    {oilRemaining.toLocaleString()} <span className="text-electric text-2xl sm:text-3xl">km</span>
+                  </div>
+                  <div className="mt-3 h-2 rounded-full bg-background overflow-hidden">
+                    <div
+                      className="h-full transition-all duration-1000"
+                      style={{ width: `${oilProgress}%`, background: "var(--gradient-electric)" }}
+                    />
+                  </div>
                 </div>
-                <div className="mt-3 h-2 rounded-full bg-background overflow-hidden">
-                  <div className="h-full w-[68%]" style={{ background: "var(--gradient-electric)" }} />
-                </div>
-              </div>
+              )}
+
               <div className="mt-6">
-                <div className="text-xs uppercase tracking-widest text-muted-foreground">Recommended Services</div>
+                <div className="text-xs uppercase tracking-widest text-muted-foreground">
+                  {checked ? "Recommended services based on your mileage" : "Recommended Services"}
+                </div>
                 <ul className="mt-3 space-y-2.5">
-                  {["Oil Change", "Tire Rotation", "Brake Inspection", "Multi-Point Inspection", "Fluid Check"].map((s) => (
-                    <li key={s} className="flex items-center gap-3 text-sm">
-                      <CheckCircle2 className="h-4 w-4 text-neon shrink-0" />
-                      <span className="flex-1">{s}</span>
-                      <span className="text-xs text-muted-foreground">Due soon</span>
-                    </li>
-                  ))}
+                  {SERVICES.map((s) => {
+                    const status = checked ? getServiceStatus(numMileage, s.intervalKm) : { label: "—", color: "text-muted-foreground" };
+                    return (
+                      <li key={s.name} className="flex items-center gap-3 text-sm">
+                        {checked ? <CheckCircle2 className={`h-4 w-4 shrink-0 ${status.label === "Due soon" ? "text-neon" : "text-electric"}`} /> : s.icon}
+                        <span className="flex-1">{s.name}</span>
+                        <span className={`text-xs font-medium ${status.color}`}>{status.label}</span>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
-              <Button variant="electric" size="lg" className="mt-6 w-full gap-2">
-                Schedule Service <ArrowRight className="h-4 w-4" />
-              </Button>
+
+              {checked && (
+                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Button variant="neon" size="lg" className="w-full gap-2">
+                    <Calendar className="h-4 w-4" /> Book Appointment
+                  </Button>
+                  <Button variant="electric" size="lg" className="w-full gap-2">
+                    <Wrench className="h-4 w-4" /> Get Service Quote
+                  </Button>
+                </div>
+              )}
+              {!checked && (
+                <Button variant="electric" size="lg" className="mt-6 w-full gap-2" disabled>
+                  Schedule Service <ArrowRight className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
         </div>
       </div>
     </section>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <Label className="text-xs uppercase tracking-widest text-muted-foreground mb-1.5 block">{label}</Label>
-      {children}
-    </div>
-  );
-}
-function SelectShell({ placeholder }: { placeholder: string }) {
-  return (
-    <button type="button" className="w-full h-11 rounded-md bg-background/60 border border-border px-3 text-left text-sm text-muted-foreground hover:border-electric/60 transition-colors flex items-center justify-between">
-      <span>{placeholder}</span>
-      <ArrowRight className="h-4 w-4 rotate-90 opacity-60" />
-    </button>
   );
 }
 
