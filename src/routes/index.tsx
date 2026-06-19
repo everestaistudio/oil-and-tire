@@ -613,7 +613,7 @@ const DRIVING = [
   "Mostly City Driving", "Mostly Highway Driving", "Mixed Driving",
   "Rural Roads", "Heavy Snow Conditions",
 ];
-const YEARS = Array.from({ length: 16 }, (_, i) => String(2025 - i));
+
 
 function TireFinder() {
   const [step, setStep] = useState(1);
