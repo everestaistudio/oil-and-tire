@@ -220,41 +220,112 @@ const MAKES = [
 
 const YEARS = Array.from({ length: 17 }, (_, i) => String(2010 + i));
 
-interface ServiceRec {
+type ServiceKey = "oil" | "rotation" | "brakes" | "fluids" | "mpi";
+
+interface ServiceDef {
+  key: ServiceKey;
   name: string;
   intervalKm: number;
+  intervalMonths: number;
+  tracksMileage: boolean;
   icon: React.ReactNode;
 }
 
-const SERVICES: ServiceRec[] = [
-  { name: "Oil Change", intervalKm: 5000, icon: <Droplet className="h-4 w-4 text-electric shrink-0" /> },
-  { name: "Tire Rotation", intervalKm: 8000, icon: <Disc3 className="h-4 w-4 text-electric shrink-0" /> },
-  { name: "Brake Inspection", intervalKm: 15000, icon: <Gauge className="h-4 w-4 text-electric shrink-0" /> },
-  { name: "Fluid Check", intervalKm: 10000, icon: <Activity className="h-4 w-4 text-electric shrink-0" /> },
-  { name: "Multi-Point Inspection", intervalKm: 20000, icon: <Wrench className="h-4 w-4 text-electric shrink-0" /> },
+const SERVICES: ServiceDef[] = [
+  { key: "oil",      name: "Oil Change",            intervalKm: 5000,  intervalMonths: 6,  tracksMileage: true,  icon: <Droplet  className="h-4 w-4 text-electric shrink-0" /> },
+  { key: "rotation", name: "Tire Rotation",         intervalKm: 8000,  intervalMonths: 6,  tracksMileage: true,  icon: <Disc3    className="h-4 w-4 text-electric shrink-0" /> },
+  { key: "brakes",   name: "Brake Inspection",      intervalKm: 15000, intervalMonths: 12, tracksMileage: false, icon: <Gauge    className="h-4 w-4 text-electric shrink-0" /> },
+  { key: "fluids",   name: "Fluid Check",           intervalKm: 10000, intervalMonths: 12, tracksMileage: false, icon: <Activity className="h-4 w-4 text-electric shrink-0" /> },
+  { key: "mpi",      name: "Multi-Point Inspection",intervalKm: 20000, intervalMonths: 12, tracksMileage: false, icon: <Wrench   className="h-4 w-4 text-electric shrink-0" /> },
 ];
 
-function getServiceStatus(mileage: number, intervalKm: number) {
-  const remaining = intervalKm - (mileage % intervalKm);
-  if (remaining <= 1000) return { label: "Due soon", color: "text-neon" };
-  if (remaining <= 3000) return { label: "Recommended", color: "text-electric" };
-  return { label: "Upcoming", color: "text-muted-foreground" };
+type StatusLabel = "Due Now" | "Due Soon" | "Upcoming" | "Recently Done";
+
+function statusStyle(label: StatusLabel) {
+  switch (label) {
+    case "Due Now":      return "text-neon";
+    case "Due Soon":     return "text-electric";
+    case "Recently Done":return "text-muted-foreground";
+    default:             return "text-muted-foreground";
+  }
 }
+
+function monthsBetween(iso: string): number | null {
+  if (!iso) return null;
+  const then = new Date(iso);
+  if (isNaN(then.getTime())) return null;
+  const now = new Date();
+  return (now.getFullYear() - then.getFullYear()) * 12 + (now.getMonth() - then.getMonth());
+}
+
+function statusFromKnown(
+  svc: ServiceDef,
+  currentKm: number,
+  lastKm: number | null,
+  lastDateIso: string,
+): StatusLabel {
+  const months = monthsBetween(lastDateIso);
+  let kmRatio = -Infinity;
+  let monthRatio = -Infinity;
+  if (svc.tracksMileage && lastKm != null && currentKm >= lastKm) {
+    kmRatio = (currentKm - lastKm) / svc.intervalKm;
+  }
+  if (months != null && months >= 0) {
+    monthRatio = months / svc.intervalMonths;
+  }
+  const ratio = Math.max(kmRatio, monthRatio);
+  if (ratio === -Infinity) return statusFromAverage(svc, currentKm);
+  if (ratio >= 1)    return "Due Now";
+  if (ratio >= 0.85) return "Due Soon";
+  if (ratio >= 0.4)  return "Upcoming";
+  return "Recently Done";
+}
+
+function statusFromAverage(svc: ServiceDef, currentKm: number): StatusLabel {
+  const remaining = svc.intervalKm - (currentKm % svc.intervalKm);
+  if (remaining <= 1000) return "Due Now";
+  if (remaining <= 3000) return "Due Soon";
+  return "Upcoming";
+}
+
+interface HistoryState {
+  oilKm: string; oilDate: string;
+  rotationKm: string; rotationDate: string;
+  brakesDate: string;
+  fluidsDate: string;
+}
+const EMPTY_HISTORY: HistoryState = {
+  oilKm: "", oilDate: "",
+  rotationKm: "", rotationDate: "",
+  brakesDate: "",
+  fluidsDate: "",
+};
 
 function HealthChecker() {
   const [make, setMake] = useState("");
   const [model, setModel] = useState("");
   const [year, setYear] = useState("");
   const [mileage, setMileage] = useState("");
+
+  const [step, setStep] = useState<1 | 2>(1);
+  const [knowsHistory, setKnowsHistory] = useState<null | boolean>(null);
+  const [history, setHistory] = useState<HistoryState>(EMPTY_HISTORY);
+
   const [checked, setChecked] = useState(false);
   const [scanning, setScanning] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
 
   const numMileage = Number(mileage);
-  const canCheck = make && model.trim() && year && mileage && numMileage >= 0;
+  const canContinue = !!(make && model.trim() && year && mileage && numMileage >= 0);
 
-  const handleCheck = () => {
-    if (!canCheck) return;
+  const handleContinue = () => {
+    if (!canContinue) return;
+    setChecked(false);
+    setStep(2);
+  };
+
+  const handleCheck = (knows: boolean) => {
+    setKnowsHistory(knows);
     setChecked(false);
     setScanning(true);
     setTimeout(() => {
@@ -264,8 +335,19 @@ function HealthChecker() {
     }, 1500);
   };
 
-  const oilRemaining = 5000 - (numMileage % 5000);
-  const oilProgress = Math.min(100, Math.max(0, ((numMileage % 5000) / 5000) * 100));
+  const results = SERVICES.map((s) => {
+    let label: StatusLabel;
+    if (knowsHistory) {
+      if (s.key === "oil")           label = statusFromKnown(s, numMileage, Number(history.oilKm) || null, history.oilDate);
+      else if (s.key === "rotation") label = statusFromKnown(s, numMileage, Number(history.rotationKm) || null, history.rotationDate);
+      else if (s.key === "brakes")   label = statusFromKnown(s, numMileage, null, history.brakesDate);
+      else if (s.key === "fluids")   label = statusFromKnown(s, numMileage, null, history.fluidsDate);
+      else                            label = statusFromAverage(s, numMileage);
+    } else {
+      label = statusFromAverage(s, numMileage);
+    }
+    return { svc: s, label };
+  });
 
   return (
     <section className="py-16 sm:py-24" id="health-checker">
@@ -277,73 +359,114 @@ function HealthChecker() {
         />
         <div className="mt-10 grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6">
           {/* Form */}
-          <div className="rounded-2xl border border-border bg-surface p-6 sm:p-7 space-y-4" style={{ boxShadow: "var(--shadow-card)" }}>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs uppercase tracking-widest text-muted-foreground mb-1.5 block">Make</Label>
-                <Select value={make} onValueChange={setMake}>
-                  <SelectTrigger className="h-11 bg-background/60 border-border">
-                    <SelectValue placeholder="Select Make" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MAKES.map((m) => (
-                      <SelectItem key={m} value={m}>{m}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs uppercase tracking-widest text-muted-foreground mb-1.5 block">Model</Label>
-                <Input
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  placeholder="e.g. Civic"
-                  className="bg-background/60 border-border h-11"
-                />
-              </div>
-              <div>
-                <Label className="text-xs uppercase tracking-widest text-muted-foreground mb-1.5 block">Year</Label>
-                <Select value={year} onValueChange={setYear}>
-                  <SelectTrigger className="h-11 bg-background/60 border-border">
-                    <SelectValue placeholder="Select Year" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {YEARS.map((y) => (
-                      <SelectItem key={y} value={y}>{y}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs uppercase tracking-widest text-muted-foreground mb-1.5 block">Current Mileage (km)</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={mileage}
-                  onChange={(e) => setMileage(e.target.value)}
-                  placeholder="48,500"
-                  className="bg-background/60 border-border h-11"
-                />
-              </div>
+          <div className="rounded-2xl border border-border bg-surface p-6 sm:p-7 space-y-5" style={{ boxShadow: "var(--shadow-card)" }}>
+            {/* Step indicator */}
+            <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-semibold">
+              <StepDot active={step >= 1} done={step > 1} n={1} label="Vehicle" />
+              <span className="flex-1 h-px bg-border" />
+              <StepDot active={step >= 2} done={false} n={2} label="History" />
             </div>
-            <Button
-              onClick={handleCheck}
-              disabled={!canCheck || scanning}
-              variant="neon"
-              size="xl"
-              className="w-full gap-2"
-            >
-              {scanning ? (
-                <>
-                  <Loader2 className="h-5 w-5 animate-spin" /> Analyzing…
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-5 w-5" /> Check My Vehicle
-                </>
-              )}
-            </Button>
-            <p className="text-xs text-muted-foreground text-center">Free service report · no commitment · demo only</p>
+
+            {step === 1 && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Make">
+                    <Select value={make} onValueChange={setMake}>
+                      <SelectTrigger className="h-11 bg-background/60 border-border">
+                        <SelectValue placeholder="Select Make" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MAKES.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field label="Model">
+                    <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="e.g. Civic" className="bg-background/60 border-border h-11" />
+                  </Field>
+                  <Field label="Year">
+                    <Select value={year} onValueChange={setYear}>
+                      <SelectTrigger className="h-11 bg-background/60 border-border">
+                        <SelectValue placeholder="Select Year" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {YEARS.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field label="Current Mileage (km)">
+                    <Input type="number" min={0} value={mileage} onChange={(e) => setMileage(e.target.value)} placeholder="48,500" className="bg-background/60 border-border h-11" />
+                  </Field>
+                </div>
+                <Button onClick={handleContinue} disabled={!canContinue} variant="neon" size="xl" className="w-full gap-2">
+                  Continue <ArrowRight className="h-5 w-5" />
+                </Button>
+                <p className="text-xs text-muted-foreground text-center">Free service report · no commitment · demo only</p>
+              </>
+            )}
+
+            {step === 2 && (
+              <>
+                <div>
+                  <div className="font-display font-bold text-lg sm:text-xl tracking-tight">Do you know your last service details?</div>
+                  <p className="mt-1.5 text-sm text-muted-foreground">More details = more accurate recommendations.</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    onClick={() => handleCheck(true)}
+                    disabled={scanning}
+                    variant={knowsHistory === true ? "neon" : "outlineElectric"}
+                    size="lg"
+                    className="w-full"
+                  >
+                    Yes, I know
+                  </Button>
+                  <Button
+                    onClick={() => handleCheck(false)}
+                    disabled={scanning}
+                    variant={knowsHistory === false ? "electric" : "outlineElectric"}
+                    size="lg"
+                    className="w-full"
+                  >
+                    Not sure
+                  </Button>
+                </div>
+
+                {knowsHistory === true && (
+                  <div className="rounded-xl border border-electric/30 bg-background/40 p-4 sm:p-5 space-y-4">
+                    <div className="text-[10px] uppercase tracking-widest text-electric font-semibold">
+                      Optional · fill what you remember
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Last Oil Change (km)">
+                        <Input type="number" min={0} value={history.oilKm} onChange={(e) => setHistory({ ...history, oilKm: e.target.value })} placeholder="43,200" className="bg-background/60 border-border h-10" />
+                      </Field>
+                      <Field label="Last Oil Change Date">
+                        <Input type="date" value={history.oilDate} onChange={(e) => setHistory({ ...history, oilDate: e.target.value })} className="bg-background/60 border-border h-10" />
+                      </Field>
+                      <Field label="Last Tire Rotation (km)">
+                        <Input type="number" min={0} value={history.rotationKm} onChange={(e) => setHistory({ ...history, rotationKm: e.target.value })} placeholder="40,000" className="bg-background/60 border-border h-10" />
+                      </Field>
+                      <Field label="Last Tire Rotation Date">
+                        <Input type="date" value={history.rotationDate} onChange={(e) => setHistory({ ...history, rotationDate: e.target.value })} className="bg-background/60 border-border h-10" />
+                      </Field>
+                      <Field label="Last Brake Inspection">
+                        <Input type="date" value={history.brakesDate} onChange={(e) => setHistory({ ...history, brakesDate: e.target.value })} className="bg-background/60 border-border h-10" />
+                      </Field>
+                      <Field label="Last Fluid Check">
+                        <Input type="date" value={history.fluidsDate} onChange={(e) => setHistory({ ...history, fluidsDate: e.target.value })} className="bg-background/60 border-border h-10" />
+                      </Field>
+                    </div>
+                    <Button onClick={() => handleCheck(true)} disabled={scanning} variant="neon" size="lg" className="w-full gap-2">
+                      {scanning ? <><Loader2 className="h-4 w-4 animate-spin" /> Analyzing…</> : <><Sparkles className="h-4 w-4" /> Update Report</>}
+                    </Button>
+                  </div>
+                )}
+
+                <button onClick={() => setStep(1)} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  ← Edit vehicle info
+                </button>
+              </>
+            )}
           </div>
 
           {/* Result Card */}
@@ -355,21 +478,22 @@ function HealthChecker() {
             style={{ boxShadow: checked ? "var(--shadow-electric)" : "var(--shadow-card)" }}
           >
             <div className="absolute inset-0 bg-grid opacity-30" />
-            {checked && (
+            {scanning && (
               <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-electric to-transparent animate-scan" />
             )}
             <div className="relative">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] uppercase tracking-widest text-electric font-semibold">
-                  {checked ? "Live Report" : "Preview"}
+                  {checked ? "Live Report" : scanning ? "Scanning…" : "Preview"}
                 </span>
                 {checked ? (
                   <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-neon">
-                    <span className="h-1.5 w-1.5 rounded-full bg-neon animate-pulse-glow" /> Healthy
+                    <span className="h-1.5 w-1.5 rounded-full bg-neon animate-pulse-glow" />
+                    {knowsHistory ? "Personalized" : "Estimate"}
                   </span>
                 ) : (
                   <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                    Fill form to generate report
+                    Awaiting input
                   </span>
                 )}
               </div>
@@ -377,47 +501,44 @@ function HealthChecker() {
               {checked && (
                 <div className="mt-5">
                   <div className="text-xs text-muted-foreground uppercase tracking-wider">
-                    Your vehicle may be due for an oil change in
+                    {knowsHistory ? "Based on your service history" : "Based on average maintenance intervals"}
                   </div>
-                  <div className="mt-1 font-display font-black text-5xl sm:text-6xl">
-                    {oilRemaining.toLocaleString()} <span className="text-electric text-2xl sm:text-3xl">km</span>
-                  </div>
-                  <div className="mt-3 h-2 rounded-full bg-background overflow-hidden">
-                    <div
-                      className="h-full transition-all duration-1000"
-                      style={{ width: `${oilProgress}%`, background: "var(--gradient-electric)" }}
-                    />
+                  <div className="mt-1.5 font-display font-black text-2xl sm:text-3xl leading-tight">
+                    Your <span className="text-electric">{year} {make} {model}</span> may be due for…
                   </div>
                 </div>
               )}
 
               <div className="mt-6">
-                <div className="text-xs uppercase tracking-widest text-muted-foreground">
-                  {checked ? "Recommended services based on your mileage" : "Recommended Services"}
-                </div>
-                <ul className="mt-3 space-y-2.5">
-                  {SERVICES.map((s) => {
-                    const status = checked ? getServiceStatus(numMileage, s.intervalKm) : { label: "—", color: "text-muted-foreground" };
-                    return (
-                      <li key={s.name} className="flex items-center gap-3 text-sm">
-                        {checked ? <CheckCircle2 className={`h-4 w-4 shrink-0 ${status.label === "Due soon" ? "text-neon" : "text-electric"}`} /> : s.icon}
-                        <span className="flex-1">{s.name}</span>
-                        <span className={`text-xs font-medium ${status.color}`}>{status.label}</span>
-                      </li>
-                    );
-                  })}
+                <ul className="space-y-2.5">
+                  {results.map(({ svc, label }) => (
+                    <li key={svc.key} className="flex items-center gap-3 text-sm rounded-lg border border-border/60 bg-background/30 px-3 py-2.5">
+                      {checked
+                        ? <CheckCircle2 className={`h-4 w-4 shrink-0 ${label === "Due Now" ? "text-neon" : "text-electric"}`} />
+                        : svc.icon}
+                      <span className="flex-1">{svc.name}</span>
+                      <span className={`text-xs font-semibold uppercase tracking-wide ${checked ? statusStyle(label) : "text-muted-foreground"}`}>
+                        {checked ? label : "—"}
+                      </span>
+                    </li>
+                  ))}
                 </ul>
               </div>
 
               {checked && (
-                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <Button variant="neon" size="lg" className="w-full gap-2">
-                    <Calendar className="h-4 w-4" /> Book Appointment
-                  </Button>
-                  <Button variant="electric" size="lg" className="w-full gap-2">
-                    <Wrench className="h-4 w-4" /> Get Service Quote
-                  </Button>
-                </div>
+                <>
+                  <div className="mt-5 rounded-lg border border-border/60 bg-background/30 px-3 py-2.5 text-[11px] text-muted-foreground leading-relaxed">
+                    This is an estimate only, not a mechanical diagnosis.
+                  </div>
+                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Button variant="neon" size="lg" className="w-full gap-2">
+                      <Calendar className="h-4 w-4" /> Book Appointment
+                    </Button>
+                    <Button variant="electric" size="lg" className="w-full gap-2">
+                      <Wrench className="h-4 w-4" /> Get Service Quote
+                    </Button>
+                  </div>
+                </>
               )}
               {!checked && (
                 <Button variant="electric" size="lg" className="mt-6 w-full gap-2" disabled>
@@ -429,6 +550,28 @@ function HealthChecker() {
         </div>
       </div>
     </section>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <Label className="text-xs uppercase tracking-widest text-muted-foreground mb-1.5 block">{label}</Label>
+      {children}
+    </div>
+  );
+}
+
+function StepDot({ active, done, n, label }: { active: boolean; done: boolean; n: number; label: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className={`h-6 w-6 grid place-items-center rounded-full text-[11px] font-bold transition-colors ${
+        done ? "bg-neon text-neon-foreground" : active ? "bg-electric text-electric-foreground" : "bg-background border border-border text-muted-foreground"
+      }`}>
+        {done ? <CheckCircle2 className="h-3.5 w-3.5" /> : n}
+      </span>
+      <span className={active ? "text-foreground" : "text-muted-foreground"}>{label}</span>
+    </div>
   );
 }
 
