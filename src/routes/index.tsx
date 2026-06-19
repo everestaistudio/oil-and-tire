@@ -575,56 +575,337 @@ function StepDot({ active, done, n, label }: { active: boolean; done: boolean; n
   );
 }
 
-/* ---------------- Tire Finder ---------------- */
+/* ---------------- AI Tire Advisor ---------------- */
+type VType = "Car / Sedan" | "SUV / CUV" | "Truck / Van";
+
+const TIRE_MODELS: Record<VType, { make: string; models: string[] }[]> = {
+  "Car / Sedan": [
+    { make: "Honda", models: ["Civic", "Accord", "Corolla"] },
+    { make: "Toyota", models: ["Camry", "Corolla", "Prius"] },
+    { make: "Hyundai", models: ["Elantra", "Sonata"] },
+    { make: "Mazda", models: ["Mazda3", "Mazda6"] },
+  ],
+  "SUV / CUV": [
+    { make: "Honda", models: ["CR-V", "Pilot"] },
+    { make: "Toyota", models: ["RAV4", "Highlander"] },
+    { make: "Ford", models: ["Escape", "Edge"] },
+    { make: "Jeep", models: ["Grand Cherokee", "Wrangler"] },
+  ],
+  "Truck / Van": [
+    { make: "Ford", models: ["F-150", "Transit"] },
+    { make: "Ram", models: ["1500", "ProMaster"] },
+    { make: "Chevrolet", models: ["Silverado 1500", "Express"] },
+    { make: "GMC", models: ["Sierra 1500"] },
+  ],
+};
+
+const FACTORY_SIZE: Record<VType, string> = {
+  "Car / Sedan": "205/55R16",
+  "SUV / CUV": "235/60R18",
+  "Truck / Van": "265/70R17",
+};
+
+const PRIORITIES = [
+  "Best Price", "Best Value", "Premium Quality", "Winter Tires",
+  "All Weather Tires", "Longest Tire Life", "Quiet Ride", "Fuel Economy",
+];
+const DRIVING = [
+  "Mostly City Driving", "Mostly Highway Driving", "Mixed Driving",
+  "Rural Roads", "Heavy Snow Conditions",
+];
+const YEARS = Array.from({ length: 16 }, (_, i) => String(2025 - i));
+
 function TireFinder() {
-  const [active, setActive] = useState("Car / Sedan");
-  const types = [
-    { label: "Car / Sedan", icon: Car },
-    { label: "SUV / CUV", icon: Bus },
-    { label: "Truck / Van", icon: Truck },
-  ];
+  const [step, setStep] = useState(1);
+  const [vType, setVType] = useState<VType | "">("");
+  const [make, setMake] = useState("");
+  const [model, setModel] = useState("");
+  const [year, setYear] = useState("");
+  const [priorities, setPriorities] = useState<string[]>([]);
+  const [driving, setDriving] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [form, setForm] = useState({ name: "", phone: "", email: "", location: "" });
+  const topRef = useRef<HTMLDivElement>(null);
+
+  const goto = (n: number) => {
+    setStep(n);
+    setTimeout(() => topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  };
+
+  const togglePriority = (p: string) =>
+    setPriorities((cur) => cur.includes(p) ? cur.filter((x) => x !== p) : [...cur, p]);
+
+  const factorySize = vType ? FACTORY_SIZE[vType as VType] : "";
+  const makesForType = vType ? TIRE_MODELS[vType as VType] : [];
+  const modelsForMake = makesForType.find((m) => m.make === make)?.models ?? [];
+
+  const recommendations = factorySize ? [
+    { tier: "GOOD", title: "Budget-Friendly", brand: "Sailun", model: "Atrezzo", size: factorySize, price: "$650–$750", desc: "Reliable everyday performance at a great price.", warranty: "60,000 km treadwear warranty" },
+    { tier: "BETTER", title: "Best Value", brand: "General", model: "Altimax", size: factorySize, price: "$800–$950", desc: "Balanced comfort, grip and longevity for daily drivers.", warranty: "85,000 km treadwear warranty" },
+    { tier: "BEST", title: "Premium Performance", brand: "Michelin", model: "Defender", size: factorySize, price: "$1,100–$1,300", desc: "Top-tier ride quality, safety and tread life.", warranty: "110,000 km treadwear warranty" },
+  ] : [];
+
+  const canNext1 = vType !== "";
+  const canNext2 = make && model && year;
+  const canNext3 = priorities.length > 0;
+  const canNext4 = driving !== "";
+
   return (
     <section id="tires" className="py-16 sm:py-24 bg-surface/40 relative">
       <div className="absolute inset-0 bg-grid opacity-20" />
       <div className="mx-auto max-w-5xl px-4 sm:px-6 relative">
-        <div className="text-center">
+        <div className="text-center" ref={topRef}>
           <div className="inline-flex items-center gap-2 rounded-full border border-electric/40 bg-electric/10 px-3 py-1 text-xs font-medium text-electric">
-            <Disc3 className="h-3.5 w-3.5" /> Tire Finder
+            <Sparkles className="h-3.5 w-3.5" /> AI Tire Advisor
           </div>
-          <h2 className="mt-5 font-display font-black text-3xl sm:text-5xl tracking-tight">FIND THE PERFECT <span className="text-electric">TIRES</span></h2>
-          <p className="mt-3 text-base sm:text-lg text-muted-foreground">Top brands. Best prices. Expert installation.</p>
+          <h2 className="mt-5 font-display font-black text-3xl sm:text-5xl tracking-tight">AI TIRE <span className="text-electric">ADVISOR</span></h2>
+          <p className="mt-3 text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto">
+            Answer a few quick questions and we'll help you find the right tires for your vehicle.
+          </p>
         </div>
 
-        <div className="mt-10 rounded-2xl border border-border bg-surface p-6 sm:p-8" style={{ boxShadow: "var(--shadow-card)" }}>
-          <div className="grid grid-cols-3 gap-3">
-            {types.map(({ label, icon: Icon }) => {
-              const on = active === label;
-              return (
-                <button key={label} onClick={() => setActive(label)}
-                  className={`group rounded-xl border p-4 sm:p-5 text-center transition-all ${on ? "border-electric bg-electric/10 ring-electric -translate-y-0.5" : "border-border bg-background/40 hover:border-electric/40"}`}>
-                  <Icon className={`h-6 w-6 mx-auto ${on ? "text-electric" : "text-muted-foreground group-hover:text-foreground"}`} />
-                  <div className="mt-2 text-xs sm:text-sm font-semibold">{label}</div>
-                </button>
-              );
-            })}
-          </div>
+        {/* Progress */}
+        <div className="mt-8 flex items-center justify-center gap-2">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <div key={n} className="flex items-center gap-2">
+              <div className={`h-2 w-8 sm:w-12 rounded-full transition-all ${n <= step ? "bg-neon" : "bg-border"}`} />
+            </div>
+          ))}
+          <span className="ml-3 text-xs text-muted-foreground font-medium">Step {step} of 5</span>
+        </div>
 
-          <Button variant="neon" size="xl" className="mt-6 w-full gap-2">
-            Get Tire Quote <ArrowRight className="h-5 w-5" />
-          </Button>
-
-          <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-            {[
-              { icon: Tag, t: "Price Match Guarantee" },
-              { icon: Award, t: "Top Brands" },
-              { icon: Wrench, t: "Expert Installation" },
-            ].map(({ icon: I, t }) => (
-              <div key={t} className="flex items-center gap-2.5 rounded-lg border border-border bg-background/40 px-3 py-2.5">
-                <I className="h-4 w-4 text-neon shrink-0" />
-                <span className="font-medium text-sm">{t}</span>
+        <div className="mt-8 rounded-2xl border border-border bg-surface p-5 sm:p-8" style={{ boxShadow: "var(--shadow-card)" }}>
+          {/* STEP 1 — Vehicle Type */}
+          {step === 1 && (
+            <div className="animate-fade-in">
+              <h3 className="font-display font-bold text-xl sm:text-2xl mb-1">Vehicle Type</h3>
+              <p className="text-sm text-muted-foreground mb-5">Choose what you drive.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {([
+                  { label: "Car / Sedan", icon: Car },
+                  { label: "SUV / CUV", icon: Bus },
+                  { label: "Truck / Van", icon: Truck },
+                ] as { label: VType; icon: typeof Car }[]).map(({ label, icon: Icon }) => {
+                  const on = vType === label;
+                  return (
+                    <button key={label} onClick={() => { setVType(label); setMake(""); setModel(""); }}
+                      className={`group rounded-xl border p-5 text-center transition-all ${on ? "border-electric bg-electric/10 ring-electric -translate-y-0.5 glow-electric" : "border-border bg-background/40 hover:border-electric/40 hover:-translate-y-0.5"}`}>
+                      <Icon className={`h-8 w-8 mx-auto ${on ? "text-electric" : "text-muted-foreground group-hover:text-foreground"}`} />
+                      <div className="mt-2 text-sm font-semibold">{label}</div>
+                    </button>
+                  );
+                })}
               </div>
-            ))}
-          </div>
+              <Button variant="neon" size="xl" disabled={!canNext1} onClick={() => goto(2)} className="mt-6 w-full gap-2">
+                Continue <ArrowRight className="h-5 w-5" />
+              </Button>
+            </div>
+          )}
+
+          {/* STEP 2 — Vehicle Info */}
+          {step === 2 && (
+            <div className="animate-fade-in">
+              <h3 className="font-display font-bold text-xl sm:text-2xl mb-1">Vehicle Information</h3>
+              <p className="text-sm text-muted-foreground mb-5">Tell us your vehicle's make, model and year.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Make</Label>
+                  <Select value={make} onValueChange={(v) => { setMake(v); setModel(""); }}>
+                    <SelectTrigger className="mt-1 h-12"><SelectValue placeholder="Select make" /></SelectTrigger>
+                    <SelectContent>
+                      {makesForType.map((m) => <SelectItem key={m.make} value={m.make}>{m.make}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Model</Label>
+                  <Select value={model} onValueChange={setModel} disabled={!make}>
+                    <SelectTrigger className="mt-1 h-12"><SelectValue placeholder="Select model" /></SelectTrigger>
+                    <SelectContent>
+                      {modelsForMake.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Year</Label>
+                  <Select value={year} onValueChange={setYear}>
+                    <SelectTrigger className="mt-1 h-12"><SelectValue placeholder="Select year" /></SelectTrigger>
+                    <SelectContent>
+                      {YEARS.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {canNext2 && (
+                <div className="mt-5 rounded-xl border border-electric/40 bg-electric/5 p-4 animate-fade-in">
+                  <div className="flex items-center gap-3">
+                    <Disc3 className="h-5 w-5 text-electric" />
+                    <div>
+                      <div className="text-xs uppercase tracking-wide text-muted-foreground">Factory Tire Size</div>
+                      <div className="font-display font-bold text-2xl text-electric">{factorySize}</div>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">Factory tire size shown for convenience. Actual size may vary.</p>
+                </div>
+              )}
+
+              <div className="mt-6 flex gap-3">
+                <Button variant="outlineElectric" size="xl" onClick={() => goto(1)} className="flex-1">Back</Button>
+                <Button variant="neon" size="xl" disabled={!canNext2} onClick={() => goto(3)} className="flex-1 gap-2">Continue <ArrowRight className="h-5 w-5" /></Button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3 — Priorities */}
+          {step === 3 && (
+            <div className="animate-fade-in">
+              <h3 className="font-display font-bold text-xl sm:text-2xl mb-1">What Are You Looking For?</h3>
+              <p className="text-sm text-muted-foreground mb-5">Pick everything that matters to you.</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {PRIORITIES.map((p) => {
+                  const on = priorities.includes(p);
+                  return (
+                    <button key={p} onClick={() => togglePriority(p)}
+                      className={`rounded-xl border px-3 py-3 text-xs sm:text-sm font-semibold text-center transition-all ${on ? "border-neon bg-neon/15 text-foreground glow-neon -translate-y-0.5" : "border-border bg-background/40 hover:border-neon/50"}`}>
+                      {p}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-6 flex gap-3">
+                <Button variant="outlineElectric" size="xl" onClick={() => goto(2)} className="flex-1">Back</Button>
+                <Button variant="neon" size="xl" disabled={!canNext3} onClick={() => goto(4)} className="flex-1 gap-2">Continue <ArrowRight className="h-5 w-5" /></Button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 4 — Driving Style */}
+          {step === 4 && (
+            <div className="animate-fade-in">
+              <h3 className="font-display font-bold text-xl sm:text-2xl mb-1">Driving Style</h3>
+              <p className="text-sm text-muted-foreground mb-5">How do you mostly drive?</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {DRIVING.map((d) => {
+                  const on = driving === d;
+                  return (
+                    <button key={d} onClick={() => setDriving(d)}
+                      className={`rounded-xl border px-4 py-4 text-sm font-semibold text-left transition-all ${on ? "border-electric bg-electric/10 glow-electric -translate-y-0.5" : "border-border bg-background/40 hover:border-electric/40"}`}>
+                      {d}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-6 flex gap-3">
+                <Button variant="outlineElectric" size="xl" onClick={() => goto(3)} className="flex-1">Back</Button>
+                <Button variant="neon" size="xl" disabled={!canNext4} onClick={() => goto(5)} className="flex-1 gap-2">See Recommendations <ArrowRight className="h-5 w-5" /></Button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 5 — Recommendations */}
+          {step === 5 && (
+            <div className="animate-fade-in">
+              <h3 className="font-display font-bold text-xl sm:text-2xl mb-1">Recommended Tire Packages</h3>
+              <p className="text-sm text-muted-foreground mb-5">
+                Based on your {year} {make} {model} • {driving}
+              </p>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {recommendations.map((r, i) => {
+                  const isBest = r.tier === "BEST";
+                  const isBetter = r.tier === "BETTER";
+                  return (
+                    <article key={r.tier}
+                      className={`relative rounded-2xl border p-5 sm:p-6 transition-all hover:-translate-y-1 ${
+                        isBest ? "border-neon bg-neon/5 glow-neon" :
+                        isBetter ? "border-electric bg-electric/5 glow-electric" :
+                        "border-border bg-background/40"
+                      }`}>
+                      <div className={`inline-block rounded-full px-3 py-1 text-xs font-display font-black tracking-wider ${
+                        isBest ? "bg-neon text-neon-foreground" :
+                        isBetter ? "bg-electric text-electric-foreground" :
+                        "bg-muted text-foreground"
+                      }`}>{r.tier}</div>
+                      <div className="mt-2 text-sm font-semibold text-muted-foreground">{r.title}</div>
+                      <h4 className="mt-3 font-display font-bold text-xl">{r.brand} {r.model}</h4>
+                      <div className="mt-1 text-sm text-muted-foreground">{r.size}</div>
+                      <div className="mt-4 pt-4 border-t border-border">
+                        <div className="text-xs uppercase tracking-wide text-muted-foreground">Estimated Installed Price</div>
+                        <div className={`font-display font-black text-2xl ${isBest ? "text-neon" : isBetter ? "text-electric" : "text-foreground"}`}>{r.price}</div>
+                      </div>
+                      <p className="mt-3 text-sm text-muted-foreground">{r.desc}</p>
+                      <div className="mt-3 flex items-start gap-2 text-xs text-muted-foreground">
+                        <ShieldCheck className="h-3.5 w-3.5 text-neon shrink-0 mt-0.5" />
+                        <span>{r.warranty}</span>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+
+              <p className="mt-5 text-xs text-muted-foreground italic">
+                Pricing shown is an estimate only and may vary based on inventory, promotions, vehicle specifications, and installation requirements.
+              </p>
+
+              {/* Final CTA */}
+              <div className="mt-8 rounded-2xl border border-neon/40 bg-background/60 p-6 sm:p-8" style={{ boxShadow: "var(--shadow-neon)" }}>
+                {!submitted ? (
+                  <>
+                    <h3 className="font-display font-black text-2xl sm:text-3xl">GET YOUR EXACT <span className="text-neon">TIRE QUOTE</span></h3>
+                    <p className="mt-2 text-sm text-muted-foreground">A tire specialist will contact you with pricing tailored to your vehicle.</p>
+                    <form
+                      className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3"
+                      onSubmit={(e) => { e.preventDefault(); setSubmitted(true); }}
+                    >
+                      <div>
+                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Name</Label>
+                        <Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1 h-12" placeholder="Your name" maxLength={100} />
+                      </div>
+                      <div>
+                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Phone</Label>
+                        <Input required type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="mt-1 h-12" placeholder="(519) 555-0123" maxLength={20} />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Email</Label>
+                        <Input required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="mt-1 h-12" placeholder="you@email.com" maxLength={255} />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Preferred Location <span className="normal-case text-muted-foreground/70">(optional)</span></Label>
+                        <Select value={form.location} onValueChange={(v) => setForm({ ...form, location: v })}>
+                          <SelectTrigger className="mt-1 h-12"><SelectValue placeholder="Select location" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Woodstock">Woodstock</SelectItem>
+                            <SelectItem value="Dorchester">Dorchester</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button type="submit" variant="neon" size="xl" className="sm:col-span-2 w-full gap-2">
+                        REQUEST EXACT TIRE QUOTE <ArrowRight className="h-5 w-5" />
+                      </Button>
+                    </form>
+                  </>
+                ) : (
+                  <div className="text-center py-6 animate-fade-in">
+                    <div className="mx-auto h-14 w-14 rounded-full bg-neon/20 grid place-items-center glow-neon">
+                      <CheckCircle2 className="h-8 w-8 text-neon" />
+                    </div>
+                    <h3 className="mt-4 font-display font-bold text-2xl">Thank you.</h3>
+                    <p className="mt-2 text-muted-foreground">A tire specialist will contact you with an exact quote.</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <Button variant="outlineElectric" size="lg" onClick={() => goto(4)} className="flex-1">Back</Button>
+                <Button variant="ghost" size="lg" onClick={() => {
+                  setStep(1); setVType(""); setMake(""); setModel(""); setYear("");
+                  setPriorities([]); setDriving(""); setSubmitted(false);
+                  setForm({ name: "", phone: "", email: "", location: "" });
+                  setTimeout(() => topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+                }} className="flex-1">Start Over</Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </section>
