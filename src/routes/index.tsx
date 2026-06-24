@@ -4,7 +4,9 @@ import {
   Phone, MapPin, Calendar, MessageCircle, Star, ShieldCheck, Users, Award,
   Droplet, Disc3, Gauge, Wrench, Activity, Snowflake, Car, Truck, Bus,
   CheckCircle2, ArrowRight, Sparkles, Clock, Tag, Loader2,
+  ClipboardCheck, AlertCircle, Navigation, DollarSign,
 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
