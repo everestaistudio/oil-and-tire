@@ -118,10 +118,11 @@ function Hero() {
           </div>
 
           <div className="mt-10 grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <TrustBadge icon={<Star className="h-4 w-4 fill-neon text-neon" />} title="4.8" sub="Google Rating" />
-            <TrustBadge icon={<MapPin className="h-4 w-4 text-electric" />} title="2 Locations" sub="Convenient" />
-            <TrustBadge icon={<ShieldCheck className="h-4 w-4 text-electric" />} title="Warranty" sub="Safe Service" />
-            <TrustBadge icon={<Users className="h-4 w-4 text-neon" />} title="Family Owned" sub="Local Trusted" />
+            <TrustBadge icon={<Star className="h-4 w-4 fill-neon text-neon" />} title="4.8★" sub="Google Rating" />
+            <TrustBadge icon={<Wrench className="h-4 w-4 text-electric" />} title="5,000+" sub="Vehicles Serviced" />
+            <TrustBadge icon={<MapPin className="h-4 w-4 text-electric" />} title="2 Locations" sub="Woodstock & Dorchester" />
+            <TrustBadge icon={<Users className="h-4 w-4 text-neon" />} title="Family Owned" sub="Since 2020" />
+
           </div>
         </div>
       </div>
