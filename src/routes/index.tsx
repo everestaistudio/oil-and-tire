@@ -1063,3 +1063,202 @@ function BarBtn({ icon, label, href = "#" }: { icon: React.ReactNode; label: str
     </a>
   );
 }
+
+/* ---------------- Emergency Floating CTA ---------------- */
+function EmergencyCTA() {
+  return (
+    <a
+      href="tel:5195375703"
+      aria-label="Call now for same-day service"
+      className="fixed z-50 right-4 bottom-24 lg:bottom-6 group"
+    >
+      <div className="relative flex items-center gap-3 rounded-full pl-4 pr-2 py-2 bg-surface-elevated/95 backdrop-blur-xl border border-neon/50 shadow-lg animate-pulse-glow">
+        <div className="hidden sm:flex flex-col leading-tight pr-1">
+          <span className="text-[10px] uppercase tracking-widest text-neon font-bold flex items-center gap-1">
+            <AlertCircle className="h-3 w-3" /> Need Service Today?
+          </span>
+          <span className="text-xs text-muted-foreground">Same-day appointments</span>
+        </div>
+        <span className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold bg-neon text-neon-foreground glow-neon">
+          <Phone className="h-4 w-4" /> Call Now
+        </span>
+      </div>
+    </a>
+  );
+}
+
+/* ---------------- Cost Estimator ---------------- */
+const ESTIMATES: Record<string, { label: string; range: string; low: number; high: number }> = {
+  oil: { label: "Oil Change", range: "$69 – $89", low: 69, high: 89 },
+  tire: { label: "Tire Change", range: "$120 – $260", low: 120, high: 260 },
+  swap: { label: "Seasonal Tire Swap", range: "$59 – $99", low: 59, high: 99 },
+  brakes: { label: "Brake Service", range: "$299 – $799", low: 299, high: 799 },
+  inspection: { label: "Vehicle Inspection", range: "$89 – $149", low: 89, high: 149 },
+  diag: { label: "Diagnostics", range: "$99 – $179", low: 99, high: 179 },
+};
+
+function CostEstimator() {
+  const [make, setMake] = useState("");
+  const [model, setModel] = useState("");
+  const [year, setYear] = useState("");
+  const [service, setService] = useState<string>("");
+  const result = service ? ESTIMATES[service] : null;
+
+  return (
+    <section id="estimator" className="py-16 sm:py-24 bg-surface/40 relative">
+      <div className="absolute inset-0 bg-grid opacity-20" />
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 relative">
+        <SectionHead
+          eyebrow="Instant pricing"
+          title={<>SERVICE COST <span className="text-electric">ESTIMATOR</span></>}
+          subtitle="Get an instant estimate before you book."
+        />
+
+        <div className="mt-10 grid grid-cols-1 lg:grid-cols-5 gap-5">
+          <div className="lg:col-span-3 rounded-2xl border border-border p-6 sm:p-8" style={{ background: "var(--gradient-surface)", boxShadow: "var(--shadow-card)" }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Vehicle Make">
+                <Input value={make} onChange={(e) => setMake(e.target.value)} placeholder="e.g. Honda" />
+              </Field>
+              <Field label="Vehicle Model">
+                <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="e.g. Civic" />
+              </Field>
+              <Field label="Vehicle Year">
+                <Input value={year} onChange={(e) => setYear(e.target.value)} placeholder="e.g. 2020" inputMode="numeric" />
+              </Field>
+              <Field label="Service Type">
+                <Select value={service} onValueChange={setService}>
+                  <SelectTrigger><SelectValue placeholder="Select service" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="oil">Oil Change</SelectItem>
+                    <SelectItem value="tire">Tire Change</SelectItem>
+                    <SelectItem value="swap">Seasonal Tire Swap</SelectItem>
+                    <SelectItem value="brakes">Brake Service</SelectItem>
+                    <SelectItem value="inspection">Vehicle Inspection</SelectItem>
+                    <SelectItem value="diag">Diagnostics</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+            <p className="mt-5 text-xs text-muted-foreground leading-relaxed">
+              Pricing shown is an estimate only. Final pricing may vary depending on vehicle specifications, parts, labour requirements, and additional services.
+            </p>
+          </div>
+
+          <div className="lg:col-span-2 relative overflow-hidden rounded-2xl border border-neon/30 p-6 sm:p-8 flex flex-col" style={{ background: "var(--gradient-surface)", boxShadow: "var(--shadow-neon)" }}>
+            <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-neon to-transparent animate-scan" />
+            <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-neon font-semibold">
+              <DollarSign className="h-4 w-4" /> Estimated Range
+            </div>
+            {result ? (
+              <>
+                <div className="mt-4 font-display font-black text-4xl sm:text-5xl tracking-tight text-foreground">{result.range}</div>
+                <div className="mt-2 text-sm text-muted-foreground">
+                  {result.label}{make || model || year ? ` — ${[year, make, model].filter(Boolean).join(" ")}` : ""}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="mt-4 font-display font-black text-3xl sm:text-4xl tracking-tight text-muted-foreground">$—</div>
+                <div className="mt-2 text-sm text-muted-foreground">Select a service to see your estimate.</div>
+              </>
+            )}
+            <div className="mt-auto pt-6 flex flex-col sm:flex-row gap-3">
+              <Button variant="neon" size="lg" className="gap-2 w-full sm:w-auto">
+                <Calendar className="h-4 w-4" /> Book Appointment
+              </Button>
+              <a href="tel:5195375703" className="w-full sm:w-auto">
+                <Button variant="outlineElectric" size="lg" className="gap-2 w-full">
+                  <Phone className="h-4 w-4" /> Call Now
+                </Button>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------------- Locations ---------------- */
+function Locations() {
+  const locations = [
+    {
+      city: "Woodstock",
+      address: "123 Dundas St, Woodstock, ON",
+      phone: "519-537-5703",
+      hours: ["Mon – Fri: 8:00 AM – 6:00 PM", "Saturday: 8:00 AM – 4:00 PM", "Sunday: Closed"],
+      map: "https://www.google.com/maps?q=Woodstock+Ontario&output=embed",
+      directions: "https://www.google.com/maps/dir/?api=1&destination=Woodstock+Ontario",
+    },
+    {
+      city: "Dorchester",
+      address: "456 Hamilton Rd, Dorchester, ON",
+      phone: "519-537-5703",
+      hours: ["Mon – Fri: 8:00 AM – 6:00 PM", "Saturday: 8:00 AM – 4:00 PM", "Sunday: Closed"],
+      map: "https://www.google.com/maps?q=Dorchester+Ontario&output=embed",
+      directions: "https://www.google.com/maps/dir/?api=1&destination=Dorchester+Ontario",
+    },
+  ];
+  return (
+    <section id="locations" className="py-16 sm:py-24">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+        <SectionHead
+          eyebrow="Find us"
+          title={<>TWO CONVENIENT <span className="text-electric">LOCATIONS</span></>}
+          subtitle="Drop by either shop — same trusted team, same honest service."
+        />
+        <div className="mt-10 grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {locations.map((loc) => (
+            <article key={loc.city} className="rounded-2xl border border-border overflow-hidden" style={{ background: "var(--gradient-surface)", boxShadow: "var(--shadow-card)" }}>
+              <div className="aspect-[16/10] w-full bg-surface relative">
+                <iframe
+                  src={loc.map}
+                  loading="lazy"
+                  title={`${loc.city} location map`}
+                  className="absolute inset-0 h-full w-full border-0 grayscale contrast-110"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+              </div>
+              <div className="p-6 sm:p-7">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="font-display font-black text-2xl tracking-tight">{loc.city}</h3>
+                  <span className="text-[10px] uppercase tracking-widest text-neon font-semibold">Open Today</span>
+                </div>
+                <div className="mt-4 space-y-3 text-sm">
+                  <div className="flex items-start gap-3">
+                    <MapPin className="h-4 w-4 text-electric mt-0.5 shrink-0" />
+                    <span className="text-foreground/90">{loc.address}</span>
+                  </div>
+                  <a href={`tel:${loc.phone.replace(/-/g, "")}`} className="flex items-start gap-3 hover:text-electric transition-colors">
+                    <Phone className="h-4 w-4 text-electric mt-0.5 shrink-0" />
+                    <span>{loc.phone}</span>
+                  </a>
+                  <div className="flex items-start gap-3">
+                    <Clock className="h-4 w-4 text-electric mt-0.5 shrink-0" />
+                    <div className="space-y-0.5 text-muted-foreground">
+                      {loc.hours.map((h) => <div key={h}>{h}</div>)}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-6 flex flex-col sm:flex-row gap-3">
+                  <a href={loc.directions} target="_blank" rel="noreferrer" className="w-full sm:w-auto">
+                    <Button variant="electric" size="lg" className="gap-2 w-full">
+                      <Navigation className="h-4 w-4" /> Get Directions
+                    </Button>
+                  </a>
+                  <a href={`tel:${loc.phone.replace(/-/g, "")}`} className="w-full sm:w-auto">
+                    <Button variant="outlineElectric" size="lg" className="gap-2 w-full">
+                      <Phone className="h-4 w-4" /> Call {loc.city}
+                    </Button>
+                  </a>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
