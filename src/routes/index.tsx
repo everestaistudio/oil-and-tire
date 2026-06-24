@@ -152,15 +152,16 @@ function TrustBadge({ icon, title, sub }: { icon: React.ReactNode; title: string
 /* ---------------- Services ---------------- */
 function Services() {
   const items = [
-    { icon: Droplet, title: "Oil Change", desc: "From $44.95", cta: "Book Now", action: "book" },
-    { icon: Disc3, title: "Tires", desc: "Top Brands, Best Prices", cta: "Get Quote", action: "quote" },
-    { icon: Gauge, title: "Brakes", desc: "Safety Starts With Brakes", cta: "Book Now", action: "book" },
-    { icon: Wrench, title: "Maintenance", desc: "Keep Your Vehicle Running Its Best", cta: "Book Now", action: "book" },
-    { icon: Activity, title: "Diagnostics", desc: "Advanced Scanning & Diagnostics", cta: "Book Now", action: "book" },
-    { icon: Snowflake, title: "Seasonal Tire Swap", desc: "Quick & Easy Seasonal Change", cta: "Book Now", action: "book" },
+    { icon: Droplet, title: "Oil Change", desc: "Full-synthetic & conventional. From $44.95.", cta: "Book Now", action: "book" },
+    { icon: Disc3, title: "Tires & Wheels", desc: "Top brands, install, balance & TPMS.", cta: "Get Quote", action: "quote" },
+    { icon: Gauge, title: "Brakes", desc: "Pads, rotors, fluid — safety first.", cta: "Book Now", action: "book" },
+    { icon: Activity, title: "Diagnostics", desc: "Advanced scanning for engine & ABS lights.", cta: "Book Now", action: "book" },
+    { icon: Snowflake, title: "Seasonal Tire Swap", desc: "Quick & easy winter / summer change-over.", cta: "Book Now", action: "book" },
+    { icon: ClipboardCheck, title: "Vehicle Inspection", desc: "Pre-purchase & safety inspections.", cta: "Book Now", action: "book" },
   ];
   return (
     <section id="services" className="py-16 sm:py-24">
+
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <SectionHead eyebrow="What we do" title={<>POPULAR <span className="text-electric">SERVICES</span></>} subtitle="Expert care for every vehicle. Transparent pricing. No surprises." />
         <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
