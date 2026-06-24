@@ -384,15 +384,21 @@ function HealthChecker() {
   const [mileage, setMileage] = useState("");
 
   const [step, setStep] = useState<1 | 2>(1);
-  const [knowsHistory, setKnowsHistory] = useState<null | boolean>(null);
+  const [historyMode, setHistoryMode] = useState<HistoryMode | null>(null);
   const [history, setHistory] = useState<HistoryState>(EMPTY_HISTORY);
 
   const [checked, setChecked] = useState(false);
   const [scanning, setScanning] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
 
+  const availableModels = make ? MODELS_BY_MAKE[make] ?? [] : [];
   const numMileage = Number(mileage);
-  const canContinue = !!(make && model.trim() && year && mileage && numMileage >= 0);
+  const canContinue = !!(make && model && year && mileage && numMileage >= 0);
+
+  const handleMakeChange = (next: string) => {
+    setMake(next);
+    setModel(""); // clear & reload models when make changes
+  };
 
   const handleContinue = () => {
     if (!canContinue) return;
@@ -400,30 +406,56 @@ function HealthChecker() {
     setStep(2);
   };
 
-  const handleCheck = (knows: boolean) => {
-    setKnowsHistory(knows);
+  const runReport = (mode: HistoryMode) => {
+    setHistoryMode(mode);
     setChecked(false);
     setScanning(true);
     setTimeout(() => {
       setScanning(false);
       setChecked(true);
       setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
-    }, 1500);
+    }, 1400);
   };
 
+  const hasHistory = historyMode === "recent" || historyMode === "some";
+
   const results = SERVICES.map((s) => {
-    let label: StatusLabel;
-    if (knowsHistory) {
-      if (s.key === "oil")           label = statusFromKnown(s, numMileage, Number(history.oilKm) || null, history.oilDate);
-      else if (s.key === "rotation") label = statusFromKnown(s, numMileage, Number(history.rotationKm) || null, history.rotationDate);
-      else if (s.key === "brakes")   label = statusFromKnown(s, numMileage, null, history.brakesDate);
-      else if (s.key === "fluids")   label = statusFromKnown(s, numMileage, null, history.fluidsDate);
-      else                            label = statusFromAverage(s, numMileage);
+    let result: StatusResult;
+    if (historyMode === "recent" || historyMode === "some") {
+      if (s.key === "oil")           result = statusFromKnown(s, numMileage, Number(history.oilKm) || null, history.oilDate);
+      else if (s.key === "rotation") result = statusFromKnown(s, numMileage, Number(history.rotationKm) || null, history.rotationDate);
+      else if (s.key === "brakes")   result = statusFromKnown(s, numMileage, null, history.brakesDate);
+      else if (s.key === "fluids")   result = statusFromKnown(s, numMileage, null, history.fluidsDate);
+      else                            result = statusFromAverage(s, numMileage);
+    } else if (historyMode === "new") {
+      // Just bought — recommend a baseline inspection on everything
+      result = statusInspectionOnly(s);
     } else {
-      label = statusFromAverage(s, numMileage);
+      // unsure or null — estimated only
+      result = statusFromAverage(s, numMileage);
     }
-    return { svc: s, label };
+    return { svc: s, result };
   });
+
+  const reportTitle = hasHistory ? "Personalized Service Forecast" : "Maintenance Planning Report";
+  const reportSubtitle = (() => {
+    switch (historyMode) {
+      case "recent": return "Based on the service history you provided";
+      case "some":   return "Based on the partial records you provided";
+      case "new":    return "Baseline plan for a newly acquired vehicle";
+      case "unsure": return "Estimated using manufacturer-typical intervals";
+      default:       return "";
+    }
+  })();
+  const confidenceBadge = (() => {
+    switch (historyMode) {
+      case "recent": return "Personalized";
+      case "some":   return "Partial history";
+      case "new":    return "Baseline plan";
+      case "unsure": return "Estimate";
+      default:       return "Estimate";
+    }
+  })();
 
   return (
     <section className="py-16 sm:py-24" id="health-checker">
@@ -447,7 +479,7 @@ function HealthChecker() {
               <>
                 <div className="grid grid-cols-2 gap-4">
                   <Field label="Make">
-                    <Select value={make} onValueChange={setMake}>
+                    <Select value={make} onValueChange={handleMakeChange}>
                       <SelectTrigger className="h-11 bg-background/60 border-border">
                         <SelectValue placeholder="Select Make" />
                       </SelectTrigger>
@@ -457,7 +489,14 @@ function HealthChecker() {
                     </Select>
                   </Field>
                   <Field label="Model">
-                    <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="e.g. Civic" className="bg-background/60 border-border h-11" />
+                    <Select value={model} onValueChange={setModel} disabled={!make}>
+                      <SelectTrigger className="h-11 bg-background/60 border-border disabled:opacity-60">
+                        <SelectValue placeholder={make ? "Select Model" : "Select Make first"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableModels.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </Field>
                   <Field label="Year">
                     <Select value={year} onValueChange={setYear}>
@@ -483,34 +522,45 @@ function HealthChecker() {
             {step === 2 && (
               <>
                 <div>
-                  <div className="font-display font-bold text-lg sm:text-xl tracking-tight">Do you know your last service details?</div>
-                  <p className="mt-1.5 text-sm text-muted-foreground">More details = more accurate recommendations.</p>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <Button
-                    onClick={() => handleCheck(true)}
-                    disabled={scanning}
-                    variant={knowsHistory === true ? "neon" : "outlineElectric"}
-                    size="lg"
-                    className="w-full"
-                  >
-                    Yes, I know
-                  </Button>
-                  <Button
-                    onClick={() => handleCheck(false)}
-                    disabled={scanning}
-                    variant={knowsHistory === false ? "electric" : "outlineElectric"}
-                    size="lg"
-                    className="w-full"
-                  >
-                    Not sure
-                  </Button>
+                  <div className="font-display font-bold text-lg sm:text-xl tracking-tight">
+                    How much service history do you have?
+                  </div>
+                  <p className="mt-1.5 text-sm text-muted-foreground">
+                    The more information you provide, the more accurate your maintenance forecast.
+                  </p>
                 </div>
 
-                {knowsHistory === true && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <HistoryOption
+                    active={historyMode === "recent"}
+                    onClick={() => setHistoryMode("recent")}
+                    title="I know my recent service history"
+                    desc="Enter dates and mileage for recent work"
+                  />
+                  <HistoryOption
+                    active={historyMode === "some"}
+                    onClick={() => setHistoryMode("some")}
+                    title="I have some records"
+                    desc="Fill in what you remember — we'll fill the gaps"
+                  />
+                  <HistoryOption
+                    active={historyMode === "new"}
+                    onClick={() => setHistoryMode("new")}
+                    title="I just bought this vehicle"
+                    desc="We'll recommend a baseline inspection plan"
+                  />
+                  <HistoryOption
+                    active={historyMode === "unsure"}
+                    onClick={() => setHistoryMode("unsure")}
+                    title="I'm not sure"
+                    desc="We'll estimate using typical intervals"
+                  />
+                </div>
+
+                {(historyMode === "recent" || historyMode === "some") && (
                   <div className="rounded-xl border border-electric/30 bg-background/40 p-4 sm:p-5 space-y-4">
                     <div className="text-[10px] uppercase tracking-widest text-electric font-semibold">
-                      Optional · fill what you remember
+                      {historyMode === "recent" ? "Enter recent service details" : "Fill in what you remember"}
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <Field label="Last Oil Change (km)">
@@ -532,11 +582,53 @@ function HealthChecker() {
                         <Input type="date" value={history.fluidsDate} onChange={(e) => setHistory({ ...history, fluidsDate: e.target.value })} className="bg-background/60 border-border h-10" />
                       </Field>
                     </div>
-                    <Button onClick={() => handleCheck(true)} disabled={scanning} variant="neon" size="lg" className="w-full gap-2">
-                      {scanning ? <><Loader2 className="h-4 w-4 animate-spin" /> Analyzing…</> : <><Sparkles className="h-4 w-4" /> Update Report</>}
-                    </Button>
                   </div>
                 )}
+
+                {historyMode === "new" && (
+                  <div className="rounded-xl border border-electric/30 bg-background/40 p-4 sm:p-5 space-y-4">
+                    <div className="text-[10px] uppercase tracking-widest text-electric font-semibold">
+                      A few details about your purchase
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Purchase Date">
+                        <Input type="date" value={history.purchaseDate} onChange={(e) => setHistory({ ...history, purchaseDate: e.target.value })} className="bg-background/60 border-border h-10" />
+                      </Field>
+                      <Field label="Mileage at Purchase">
+                        <Input type="number" min={0} value={history.purchaseKm} onChange={(e) => setHistory({ ...history, purchaseKm: e.target.value })} placeholder="42,000" className="bg-background/60 border-border h-10" />
+                      </Field>
+                    </div>
+                    <label className="flex items-start gap-2 text-xs text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={history.hasCarfax}
+                        onChange={(e) => setHistory({ ...history, hasCarfax: e.target.checked })}
+                        className="mt-0.5 accent-electric"
+                      />
+                      I have a Carfax or service report I can share at the appointment
+                    </label>
+                    <div className="text-[11px] text-muted-foreground leading-relaxed">
+                      Recommendation: start with a multi-point inspection so we can build an accurate plan together.
+                    </div>
+                  </div>
+                )}
+
+                {historyMode === "unsure" && (
+                  <div className="rounded-xl border border-border bg-background/40 p-4 sm:p-5 text-[12px] text-muted-foreground leading-relaxed">
+                    No problem — we'll generate a planning report using typical manufacturer intervals.
+                    Bring the vehicle in and we can verify everything on a free inspection.
+                  </div>
+                )}
+
+                <Button
+                  onClick={() => historyMode && runReport(historyMode)}
+                  disabled={scanning || !historyMode}
+                  variant="neon"
+                  size="lg"
+                  className="w-full gap-2"
+                >
+                  {scanning ? <><Loader2 className="h-4 w-4 animate-spin" /> Analyzing…</> : <><Sparkles className="h-4 w-4" /> Generate Report</>}
+                </Button>
 
                 <button onClick={() => setStep(1)} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
                   ← Edit vehicle info
@@ -565,7 +657,7 @@ function HealthChecker() {
                 {checked ? (
                   <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-neon">
                     <span className="h-1.5 w-1.5 rounded-full bg-neon animate-pulse-glow" />
-                    {knowsHistory ? "Personalized" : "Estimate"}
+                    {confidenceBadge}
                   </span>
                 ) : (
                   <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -577,24 +669,32 @@ function HealthChecker() {
               {checked && (
                 <div className="mt-5">
                   <div className="text-xs text-muted-foreground uppercase tracking-wider">
-                    {knowsHistory ? "Based on your service history" : "Based on average maintenance intervals"}
+                    {reportSubtitle}
                   </div>
                   <div className="mt-1.5 font-display font-black text-2xl sm:text-3xl leading-tight">
-                    Your <span className="text-electric">{year} {make} {model}</span> may be due for…
+                    {reportTitle}
+                  </div>
+                  <div className="mt-1 text-sm text-muted-foreground">
+                    for your <span className="text-electric">{year} {make} {model}</span>
                   </div>
                 </div>
               )}
 
               <div className="mt-6">
                 <ul className="space-y-2.5">
-                  {results.map(({ svc, label }) => (
-                    <li key={svc.key} className="flex items-center gap-3 text-sm rounded-lg border border-border/60 bg-background/30 px-3 py-2.5">
+                  {results.map(({ svc, result }) => (
+                    <li key={svc.key} className="flex items-start gap-3 text-sm rounded-lg border border-border/60 bg-background/30 px-3 py-2.5">
                       {checked
-                        ? <CheckCircle2 className={`h-4 w-4 shrink-0 ${label === "Due Now" ? "text-neon" : "text-electric"}`} />
-                        : svc.icon}
-                      <span className="flex-1">{svc.name}</span>
-                      <span className={`text-xs font-semibold uppercase tracking-wide ${checked ? statusStyle(label) : "text-muted-foreground"}`}>
-                        {checked ? label : "—"}
+                        ? <CheckCircle2 className={`h-4 w-4 mt-0.5 shrink-0 ${result.label === "Due Now" ? "text-neon" : "text-electric"}`} />
+                        : <span className="mt-0.5">{svc.icon}</span>}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium">{svc.name}</div>
+                        {checked && (
+                          <div className="text-[11px] text-muted-foreground mt-0.5">{result.detail}</div>
+                        )}
+                      </div>
+                      <span className={`text-xs font-semibold uppercase tracking-wide whitespace-nowrap ${checked ? statusStyle(result.label) : "text-muted-foreground"}`}>
+                        {checked ? result.label : "—"}
                       </span>
                     </li>
                   ))}
@@ -604,7 +704,9 @@ function HealthChecker() {
               {checked && (
                 <>
                   <div className="mt-5 rounded-lg border border-border/60 bg-background/30 px-3 py-2.5 text-[11px] text-muted-foreground leading-relaxed">
-                    This is an estimate only, not a mechanical diagnosis.
+                    {hasHistory
+                      ? "Forecast based on the details you provided. A technician inspection confirms exact wear and condition."
+                      : "These are planning suggestions based on typical intervals — not a diagnosis. A quick inspection at our shop will confirm what's actually needed."}
                   </div>
                   <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Button variant="neon" size="lg" className="w-full gap-2">
@@ -622,6 +724,32 @@ function HealthChecker() {
                 </Button>
               )}
             </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function HistoryOption({
+  active, onClick, title, desc,
+}: { active: boolean; onClick: () => void; title: string; desc: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`text-left rounded-xl border p-4 transition-all ${
+        active
+          ? "border-electric bg-electric/10 shadow-[var(--shadow-electric)]"
+          : "border-border bg-background/40 hover:border-electric/50 hover:bg-background/60"
+      }`}
+    >
+      <div className={`text-sm font-semibold ${active ? "text-electric" : "text-foreground"}`}>{title}</div>
+      <div className="mt-1 text-[11px] text-muted-foreground leading-relaxed">{desc}</div>
+    </button>
+  );
+}
+
           </div>
         </div>
       </div>
