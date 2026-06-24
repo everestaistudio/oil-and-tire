@@ -596,29 +596,34 @@ function HealthChecker() {
                   />
                 </div>
 
-                {(historyMode === "recent" || historyMode === "some") && (
+                {/* Full / partial record inputs (recent, some, OR new + yes/partial) */}
+                {(historyMode === "recent" ||
+                  historyMode === "some" ||
+                  (historyMode === "new" && (history.records === "yes" || history.records === "partial"))) && (
                   <div className="rounded-xl border border-electric/30 bg-background/40 p-4 sm:p-5 space-y-4">
                     <div className="text-[10px] uppercase tracking-widest text-electric font-semibold">
-                      {historyMode === "recent" ? "Enter recent service details" : "Fill in what you remember"}
+                      {historyMode === "recent" || history.records === "yes"
+                        ? "Enter service details"
+                        : "Fill in what you remember"}
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <Field label="Last Oil Change (km)">
                         <Input type="number" min={0} value={history.oilKm} onChange={(e) => setHistory({ ...history, oilKm: e.target.value })} placeholder="43,200" className="bg-background/60 border-border h-10" />
                       </Field>
                       <Field label="Last Oil Change Date">
-                        <Input type="date" value={history.oilDate} onChange={(e) => setHistory({ ...history, oilDate: e.target.value })} className="bg-background/60 border-border h-10" />
+                        <Input type="date" value={history.oilDate} onChange={(e) => setHistory({ ...history, oilDate: e.target.value })} className="bg-background/60 border-border h-10 [color-scheme:dark]" />
                       </Field>
                       <Field label="Last Tire Rotation (km)">
                         <Input type="number" min={0} value={history.rotationKm} onChange={(e) => setHistory({ ...history, rotationKm: e.target.value })} placeholder="40,000" className="bg-background/60 border-border h-10" />
                       </Field>
                       <Field label="Last Tire Rotation Date">
-                        <Input type="date" value={history.rotationDate} onChange={(e) => setHistory({ ...history, rotationDate: e.target.value })} className="bg-background/60 border-border h-10" />
+                        <Input type="date" value={history.rotationDate} onChange={(e) => setHistory({ ...history, rotationDate: e.target.value })} className="bg-background/60 border-border h-10 [color-scheme:dark]" />
                       </Field>
                       <Field label="Last Brake Inspection">
-                        <Input type="date" value={history.brakesDate} onChange={(e) => setHistory({ ...history, brakesDate: e.target.value })} className="bg-background/60 border-border h-10" />
+                        <Input type="date" value={history.brakesDate} onChange={(e) => setHistory({ ...history, brakesDate: e.target.value })} className="bg-background/60 border-border h-10 [color-scheme:dark]" />
                       </Field>
                       <Field label="Last Fluid Check">
-                        <Input type="date" value={history.fluidsDate} onChange={(e) => setHistory({ ...history, fluidsDate: e.target.value })} className="bg-background/60 border-border h-10" />
+                        <Input type="date" value={history.fluidsDate} onChange={(e) => setHistory({ ...history, fluidsDate: e.target.value })} className="bg-background/60 border-border h-10 [color-scheme:dark]" />
                       </Field>
                     </div>
                   </div>
@@ -629,26 +634,50 @@ function HealthChecker() {
                     <div className="text-[10px] uppercase tracking-widest text-electric font-semibold">
                       A few details about your purchase
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field label="Purchase Date">
-                        <Input type="date" value={history.purchaseDate} onChange={(e) => setHistory({ ...history, purchaseDate: e.target.value })} className="bg-background/60 border-border h-10" />
-                      </Field>
-                      <Field label="Mileage at Purchase">
-                        <Input type="number" min={0} value={history.purchaseKm} onChange={(e) => setHistory({ ...history, purchaseKm: e.target.value })} placeholder="42,000" className="bg-background/60 border-border h-10" />
-                      </Field>
-                    </div>
-                    <label className="flex items-start gap-2 text-xs text-muted-foreground">
-                      <input
-                        type="checkbox"
-                        checked={history.hasCarfax}
-                        onChange={(e) => setHistory({ ...history, hasCarfax: e.target.checked })}
-                        className="mt-0.5 accent-electric"
+                    <Field label="Purchase Date">
+                      <Input
+                        type="date"
+                        value={history.purchaseDate}
+                        onChange={(e) => setHistory({ ...history, purchaseDate: e.target.value })}
+                        className="bg-background/60 border-border h-10 [color-scheme:dark]"
                       />
-                      I have a Carfax or service report I can share at the appointment
-                    </label>
-                    <div className="text-[11px] text-muted-foreground leading-relaxed">
-                      Recommendation: start with a multi-point inspection so we can build an accurate plan together.
+                    </Field>
+
+                    <div>
+                      <Label className="text-xs uppercase tracking-widest text-muted-foreground mb-2 block">
+                        Did you receive maintenance records?
+                      </Label>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {([
+                          { v: "yes",     t: "Yes",             d: "Full records" },
+                          { v: "partial", t: "Partial Records",  d: "Some history" },
+                          { v: "none",    t: "No Records",       d: "Nothing on file" },
+                        ] as { v: RecordsLevel; t: string; d: string }[]).map((opt) => {
+                          const active = history.records === opt.v;
+                          return (
+                            <button
+                              key={opt.v}
+                              type="button"
+                              onClick={() => setHistory({ ...history, records: opt.v })}
+                              className={`text-left rounded-lg border px-3 py-2.5 transition-all ${
+                                active
+                                  ? "border-electric bg-electric/10 shadow-[var(--shadow-electric)]"
+                                  : "border-border bg-background/40 hover:border-electric/50"
+                              }`}
+                            >
+                              <div className={`text-sm font-semibold ${active ? "text-electric" : "text-foreground"}`}>{opt.t}</div>
+                              <div className="mt-0.5 text-[11px] text-muted-foreground">{opt.d}</div>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
+
+                    {history.records === "none" && (
+                      <div className="rounded-lg border border-border/60 bg-background/30 px-3 py-2.5 text-[11px] text-muted-foreground leading-relaxed">
+                        Because previous maintenance history is unknown, we won't guess at what's due. We'll recommend a baseline inspection plan so future service is tracked accurately.
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -661,13 +690,14 @@ function HealthChecker() {
 
                 <Button
                   onClick={() => historyMode && runReport(historyMode)}
-                  disabled={scanning || !historyMode}
+                  disabled={scanning || !canGenerate}
                   variant="neon"
                   size="lg"
                   className="w-full gap-2"
                 >
                   {scanning ? <><Loader2 className="h-4 w-4 animate-spin" /> Analyzing…</> : <><Sparkles className="h-4 w-4" /> Generate Report</>}
                 </Button>
+
 
                 <button onClick={() => setStep(1)} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
                   ← Edit vehicle info
