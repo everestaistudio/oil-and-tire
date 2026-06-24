@@ -4,7 +4,7 @@ import {
   Phone, MapPin, Calendar, MessageCircle, Star, ShieldCheck, Users, Award,
   Droplet, Disc3, Gauge, Wrench, Activity, Snowflake, Car, Truck, Bus,
   CheckCircle2, ArrowRight, Sparkles, Clock, Tag, Loader2,
-  ClipboardCheck, AlertCircle, Navigation, DollarSign,
+  ClipboardCheck, AlertCircle, Navigation, DollarSign, BatteryCharging,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -356,6 +356,7 @@ function statusInspectionOnly(svc: ServiceDef): StatusResult {
 }
 
 type HistoryMode = "recent" | "some" | "new" | "unsure";
+type RecordsLevel = "" | "yes" | "partial" | "none";
 
 interface HistoryState {
   oilKm: string; oilDate: string;
@@ -365,6 +366,7 @@ interface HistoryState {
   purchaseDate: string;
   purchaseKm: string;
   hasCarfax: boolean;
+  records: RecordsLevel;
 }
 const EMPTY_HISTORY: HistoryState = {
   oilKm: "", oilDate: "",
@@ -374,7 +376,22 @@ const EMPTY_HISTORY: HistoryState = {
   purchaseDate: "",
   purchaseKm: "",
   hasCarfax: false,
+  records: "",
 };
+
+interface BaselineService {
+  key: string;
+  name: string;
+  detail: string;
+  icon: React.ReactNode;
+}
+const BASELINE_SERVICES: BaselineService[] = [
+  { key: "mpi",     name: "Multi-Point Inspection",   detail: "Comprehensive vehicle walk-around to establish current condition.", icon: <Wrench           className="h-4 w-4 text-electric shrink-0" /> },
+  { key: "brakes",  name: "Brake Inspection",         detail: "Measure pad thickness, rotor condition and brake fluid quality.",   icon: <Gauge            className="h-4 w-4 text-electric shrink-0" /> },
+  { key: "fluids",  name: "Fluid Condition Check",    detail: "Test engine oil, coolant, transmission and brake fluid condition.", icon: <Activity         className="h-4 w-4 text-electric shrink-0" /> },
+  { key: "tires",   name: "Tire Assessment",          detail: "Tread depth, wear pattern, age and pressure check on all tires.",   icon: <Disc3            className="h-4 w-4 text-electric shrink-0" /> },
+  { key: "battery", name: "Battery Health Check",     detail: "Load test the battery and inspect charging system performance.",    icon: <BatteryCharging  className="h-4 w-4 text-electric shrink-0" /> },
+];
 
 
 function HealthChecker() {
@@ -417,45 +434,67 @@ function HealthChecker() {
     }, 1400);
   };
 
-  const hasHistory = historyMode === "recent" || historyMode === "some";
+  // Effective records level: explicit for "new"; implicit for the other modes.
+  const recordsLevel: RecordsLevel =
+    historyMode === "new"    ? history.records :
+    historyMode === "recent" ? "yes" :
+    historyMode === "some"   ? "partial" :
+    "none";
+
+  // "Just bought + no records" → no forecast, just a baseline report.
+  const isBaselineReport = historyMode === "new" && history.records === "none";
+  // Anything with usable history (recent / some / new+yes / new+partial) → personalized forecast.
+  const isPersonalized =
+    historyMode === "recent" ||
+    historyMode === "some"   ||
+    (historyMode === "new" && (history.records === "yes" || history.records === "partial"));
+
+  const canGenerate = (() => {
+    if (!historyMode) return false;
+    if (historyMode === "new") {
+      if (!history.purchaseDate || !history.records) return false;
+      if (history.records === "yes" && !history.oilKm && !history.oilDate) return false;
+    }
+    return true;
+  })();
 
   const results = SERVICES.map((s) => {
     let result: StatusResult;
-    if (historyMode === "recent" || historyMode === "some") {
+    if (isPersonalized) {
       if (s.key === "oil")           result = statusFromKnown(s, numMileage, Number(history.oilKm) || null, history.oilDate);
       else if (s.key === "rotation") result = statusFromKnown(s, numMileage, Number(history.rotationKm) || null, history.rotationDate);
       else if (s.key === "brakes")   result = statusFromKnown(s, numMileage, null, history.brakesDate);
       else if (s.key === "fluids")   result = statusFromKnown(s, numMileage, null, history.fluidsDate);
-      else                            result = statusFromAverage(s, numMileage);
-    } else if (historyMode === "new") {
-      // Just bought — recommend a baseline inspection on everything
-      result = statusInspectionOnly(s);
-    } else {
-      // unsure or null — estimated only
+      else                            result = statusInspectionOnly(s);
+    } else if (historyMode === "unsure") {
       result = statusFromAverage(s, numMileage);
+    } else {
+      result = statusInspectionOnly(s);
     }
     return { svc: s, result };
   });
 
-  const reportTitle = hasHistory ? "Personalized Service Forecast" : "Maintenance Planning Report";
+  const reportTitle =
+    isBaselineReport ? "New Vehicle Baseline Report" :
+    isPersonalized   ? "Personalized Maintenance Forecast" :
+    "Maintenance Planning Report";
+
   const reportSubtitle = (() => {
-    switch (historyMode) {
-      case "recent": return "Based on the service history you provided";
-      case "some":   return "Based on the partial records you provided";
-      case "new":    return "Baseline plan for a newly acquired vehicle";
-      case "unsure": return "Estimated using manufacturer-typical intervals";
-      default:       return "";
-    }
+    if (isBaselineReport) return "Because previous maintenance history is unknown, we recommend establishing a service baseline.";
+    if (historyMode === "recent") return "Based on the service history you provided";
+    if (historyMode === "some")   return "Based on the partial records you provided";
+    if (historyMode === "new" && history.records === "yes")     return "Based on the records you received with the vehicle";
+    if (historyMode === "new" && history.records === "partial") return "Based on the partial records you received with the vehicle";
+    if (historyMode === "unsure") return "Estimated using manufacturer-typical intervals";
+    return "";
   })();
+
   const confidenceBadge = (() => {
-    switch (historyMode) {
-      case "recent": return "Personalized";
-      case "some":   return "Partial history";
-      case "new":    return "Baseline plan";
-      case "unsure": return "Estimate";
-      default:       return "Estimate";
-    }
+    if (isBaselineReport) return "Baseline report";
+    if (isPersonalized)   return recordsLevel === "partial" ? "Partial history" : "Personalized";
+    return "Estimate";
   })();
+
 
   return (
     <section className="py-16 sm:py-24" id="health-checker">
@@ -557,29 +596,34 @@ function HealthChecker() {
                   />
                 </div>
 
-                {(historyMode === "recent" || historyMode === "some") && (
+                {/* Full / partial record inputs (recent, some, OR new + yes/partial) */}
+                {(historyMode === "recent" ||
+                  historyMode === "some" ||
+                  (historyMode === "new" && (history.records === "yes" || history.records === "partial"))) && (
                   <div className="rounded-xl border border-electric/30 bg-background/40 p-4 sm:p-5 space-y-4">
                     <div className="text-[10px] uppercase tracking-widest text-electric font-semibold">
-                      {historyMode === "recent" ? "Enter recent service details" : "Fill in what you remember"}
+                      {historyMode === "recent" || history.records === "yes"
+                        ? "Enter service details"
+                        : "Fill in what you remember"}
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <Field label="Last Oil Change (km)">
                         <Input type="number" min={0} value={history.oilKm} onChange={(e) => setHistory({ ...history, oilKm: e.target.value })} placeholder="43,200" className="bg-background/60 border-border h-10" />
                       </Field>
                       <Field label="Last Oil Change Date">
-                        <Input type="date" value={history.oilDate} onChange={(e) => setHistory({ ...history, oilDate: e.target.value })} className="bg-background/60 border-border h-10" />
+                        <Input type="date" value={history.oilDate} onChange={(e) => setHistory({ ...history, oilDate: e.target.value })} className="bg-background/60 border-border h-10 [color-scheme:dark]" />
                       </Field>
                       <Field label="Last Tire Rotation (km)">
                         <Input type="number" min={0} value={history.rotationKm} onChange={(e) => setHistory({ ...history, rotationKm: e.target.value })} placeholder="40,000" className="bg-background/60 border-border h-10" />
                       </Field>
                       <Field label="Last Tire Rotation Date">
-                        <Input type="date" value={history.rotationDate} onChange={(e) => setHistory({ ...history, rotationDate: e.target.value })} className="bg-background/60 border-border h-10" />
+                        <Input type="date" value={history.rotationDate} onChange={(e) => setHistory({ ...history, rotationDate: e.target.value })} className="bg-background/60 border-border h-10 [color-scheme:dark]" />
                       </Field>
                       <Field label="Last Brake Inspection">
-                        <Input type="date" value={history.brakesDate} onChange={(e) => setHistory({ ...history, brakesDate: e.target.value })} className="bg-background/60 border-border h-10" />
+                        <Input type="date" value={history.brakesDate} onChange={(e) => setHistory({ ...history, brakesDate: e.target.value })} className="bg-background/60 border-border h-10 [color-scheme:dark]" />
                       </Field>
                       <Field label="Last Fluid Check">
-                        <Input type="date" value={history.fluidsDate} onChange={(e) => setHistory({ ...history, fluidsDate: e.target.value })} className="bg-background/60 border-border h-10" />
+                        <Input type="date" value={history.fluidsDate} onChange={(e) => setHistory({ ...history, fluidsDate: e.target.value })} className="bg-background/60 border-border h-10 [color-scheme:dark]" />
                       </Field>
                     </div>
                   </div>
@@ -590,26 +634,50 @@ function HealthChecker() {
                     <div className="text-[10px] uppercase tracking-widest text-electric font-semibold">
                       A few details about your purchase
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field label="Purchase Date">
-                        <Input type="date" value={history.purchaseDate} onChange={(e) => setHistory({ ...history, purchaseDate: e.target.value })} className="bg-background/60 border-border h-10" />
-                      </Field>
-                      <Field label="Mileage at Purchase">
-                        <Input type="number" min={0} value={history.purchaseKm} onChange={(e) => setHistory({ ...history, purchaseKm: e.target.value })} placeholder="42,000" className="bg-background/60 border-border h-10" />
-                      </Field>
-                    </div>
-                    <label className="flex items-start gap-2 text-xs text-muted-foreground">
-                      <input
-                        type="checkbox"
-                        checked={history.hasCarfax}
-                        onChange={(e) => setHistory({ ...history, hasCarfax: e.target.checked })}
-                        className="mt-0.5 accent-electric"
+                    <Field label="Purchase Date">
+                      <Input
+                        type="date"
+                        value={history.purchaseDate}
+                        onChange={(e) => setHistory({ ...history, purchaseDate: e.target.value })}
+                        className="bg-background/60 border-border h-10 [color-scheme:dark]"
                       />
-                      I have a Carfax or service report I can share at the appointment
-                    </label>
-                    <div className="text-[11px] text-muted-foreground leading-relaxed">
-                      Recommendation: start with a multi-point inspection so we can build an accurate plan together.
+                    </Field>
+
+                    <div>
+                      <Label className="text-xs uppercase tracking-widest text-muted-foreground mb-2 block">
+                        Did you receive maintenance records?
+                      </Label>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {([
+                          { v: "yes",     t: "Yes",             d: "Full records" },
+                          { v: "partial", t: "Partial Records",  d: "Some history" },
+                          { v: "none",    t: "No Records",       d: "Nothing on file" },
+                        ] as { v: RecordsLevel; t: string; d: string }[]).map((opt) => {
+                          const active = history.records === opt.v;
+                          return (
+                            <button
+                              key={opt.v}
+                              type="button"
+                              onClick={() => setHistory({ ...history, records: opt.v })}
+                              className={`text-left rounded-lg border px-3 py-2.5 transition-all ${
+                                active
+                                  ? "border-electric bg-electric/10 shadow-[var(--shadow-electric)]"
+                                  : "border-border bg-background/40 hover:border-electric/50"
+                              }`}
+                            >
+                              <div className={`text-sm font-semibold ${active ? "text-electric" : "text-foreground"}`}>{opt.t}</div>
+                              <div className="mt-0.5 text-[11px] text-muted-foreground">{opt.d}</div>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
+
+                    {history.records === "none" && (
+                      <div className="rounded-lg border border-border/60 bg-background/30 px-3 py-2.5 text-[11px] text-muted-foreground leading-relaxed">
+                        Because previous maintenance history is unknown, we won't guess at what's due. We'll recommend a baseline inspection plan so future service is tracked accurately.
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -622,13 +690,14 @@ function HealthChecker() {
 
                 <Button
                   onClick={() => historyMode && runReport(historyMode)}
-                  disabled={scanning || !historyMode}
+                  disabled={scanning || !canGenerate}
                   variant="neon"
                   size="lg"
                   className="w-full gap-2"
                 >
                   {scanning ? <><Loader2 className="h-4 w-4 animate-spin" /> Analyzing…</> : <><Sparkles className="h-4 w-4" /> Generate Report</>}
                 </Button>
+
 
                 <button onClick={() => setStep(1)} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
                   ← Edit vehicle info
@@ -681,33 +750,53 @@ function HealthChecker() {
               )}
 
               <div className="mt-6">
-                <ul className="space-y-2.5">
-                  {results.map(({ svc, result }) => (
-                    <li key={svc.key} className="flex items-start gap-3 text-sm rounded-lg border border-border/60 bg-background/30 px-3 py-2.5">
-                      {checked
-                        ? <CheckCircle2 className={`h-4 w-4 mt-0.5 shrink-0 ${result.label === "Due Now" ? "text-neon" : "text-electric"}`} />
-                        : <span className="mt-0.5">{svc.icon}</span>}
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium">{svc.name}</div>
-                        {checked && (
-                          <div className="text-[11px] text-muted-foreground mt-0.5">{result.detail}</div>
-                        )}
-                      </div>
-                      <span className={`text-xs font-semibold uppercase tracking-wide whitespace-nowrap ${checked ? statusStyle(result.label) : "text-muted-foreground"}`}>
-                        {checked ? result.label : "—"}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                {checked && isBaselineReport ? (
+                  <ul className="space-y-2.5">
+                    {BASELINE_SERVICES.map((b) => (
+                      <li key={b.key} className="flex items-start gap-3 text-sm rounded-lg border border-border/60 bg-background/30 px-3 py-2.5">
+                        <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-electric" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium">{b.name}</div>
+                          <div className="text-[11px] text-muted-foreground mt-0.5">{b.detail}</div>
+                        </div>
+                        <span className="text-xs font-semibold uppercase tracking-wide whitespace-nowrap text-electric">
+                          Recommended
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <ul className="space-y-2.5">
+                    {results.map(({ svc, result }) => (
+                      <li key={svc.key} className="flex items-start gap-3 text-sm rounded-lg border border-border/60 bg-background/30 px-3 py-2.5">
+                        {checked
+                          ? <CheckCircle2 className={`h-4 w-4 mt-0.5 shrink-0 ${result.label === "Due Now" ? "text-neon" : "text-electric"}`} />
+                          : <span className="mt-0.5">{svc.icon}</span>}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium">{svc.name}</div>
+                          {checked && (
+                            <div className="text-[11px] text-muted-foreground mt-0.5">{result.detail}</div>
+                          )}
+                        </div>
+                        <span className={`text-xs font-semibold uppercase tracking-wide whitespace-nowrap ${checked ? statusStyle(result.label) : "text-muted-foreground"}`}>
+                          {checked ? result.label : "—"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
 
               {checked && (
                 <>
                   <div className="mt-5 rounded-lg border border-border/60 bg-background/30 px-3 py-2.5 text-[11px] text-muted-foreground leading-relaxed">
-                    {hasHistory
+                    {isBaselineReport
+                      ? "We're not guessing what your vehicle needs. Start with a baseline inspection so every future recommendation is based on real condition data."
+                      : isPersonalized
                       ? "Forecast based on the details you provided. A technician inspection confirms exact wear and condition."
                       : "These are planning suggestions based on typical intervals — not a diagnosis. A quick inspection at our shop will confirm what's actually needed."}
                   </div>
+
                   <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Button variant="neon" size="lg" className="w-full gap-2">
                       <Calendar className="h-4 w-4" /> Book Appointment
