@@ -85,8 +85,9 @@ function Hero() {
   return (
     <section className="relative isolate overflow-hidden">
       <div className="absolute inset-0 -z-10">
-        <img src={heroShop} alt="High-tech automotive service shop" width={1920} height={1080} className="h-full w-full object-cover opacity-50" />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/70 to-background" />
+        <img src={heroShop} alt="High-tech automotive service shop" width={1920} height={1080} className="h-full w-full object-cover opacity-80" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/15 via-background/40 to-background" />
+
         <div className="absolute inset-0 bg-grid opacity-40" />
         <div className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-electric/20 blur-3xl" />
         <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-neon/10 blur-3xl" />
