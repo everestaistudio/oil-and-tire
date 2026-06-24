@@ -1203,11 +1203,12 @@ function TireFinder() {
 /* ---------------- Family ---------------- */
 function Family() {
   const team = [
-    { name: "Justin", role: "Owner / Operator", initial: "J" },
+    { name: "Samundra Khatiwoda", role: "Owner", initial: "S" },
+    { name: "Nishan Monger", role: "Owner", initial: "N" },
     { name: "Mike", role: "Master Technician", initial: "M" },
-    { name: "Kyle", role: "Technician", initial: "K" },
     { name: "Amanda", role: "Service Advisor", initial: "A" },
   ];
+
   return (
     <section id="team" className="py-16 sm:py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
@@ -1284,8 +1285,19 @@ function Footer() {
         </div>
         <div className="mt-12 pt-6 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
           <p>© {new Date().getFullYear()} Hi-Tech Oil N' Tire. All rights reserved.</p>
-          <p>Built for Canadian drivers, eh.</p>
+          <p>
+            Designed & developed by{" "}
+            <a
+              href="https://websolti.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-electric hover:text-neon transition-colors"
+            >
+              WebSolti
+            </a>
+          </p>
         </div>
+
       </div>
     </footer>
   );
