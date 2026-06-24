@@ -68,9 +68,10 @@ function Header() {
           <a href="#services" className="hover:text-foreground transition-colors">Services</a>
           <a href="#tires" className="hover:text-foreground transition-colors">Tires</a>
           <a href="#reviews" className="hover:text-foreground transition-colors">Reviews</a>
+          <a href="#locations" className="hover:text-foreground transition-colors">Locations</a>
           <a href="#team" className="hover:text-foreground transition-colors">About</a>
-          <a href="#promos" className="hover:text-foreground transition-colors">Promotions</a>
         </nav>
+
         <div className="flex items-center gap-2">
           <a href="tel:5195375703" className="hidden sm:inline-flex">
             <Button variant="outlineElectric" size="sm" className="gap-2">
