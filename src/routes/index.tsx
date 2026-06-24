@@ -750,33 +750,53 @@ function HealthChecker() {
               )}
 
               <div className="mt-6">
-                <ul className="space-y-2.5">
-                  {results.map(({ svc, result }) => (
-                    <li key={svc.key} className="flex items-start gap-3 text-sm rounded-lg border border-border/60 bg-background/30 px-3 py-2.5">
-                      {checked
-                        ? <CheckCircle2 className={`h-4 w-4 mt-0.5 shrink-0 ${result.label === "Due Now" ? "text-neon" : "text-electric"}`} />
-                        : <span className="mt-0.5">{svc.icon}</span>}
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium">{svc.name}</div>
-                        {checked && (
-                          <div className="text-[11px] text-muted-foreground mt-0.5">{result.detail}</div>
-                        )}
-                      </div>
-                      <span className={`text-xs font-semibold uppercase tracking-wide whitespace-nowrap ${checked ? statusStyle(result.label) : "text-muted-foreground"}`}>
-                        {checked ? result.label : "—"}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                {checked && isBaselineReport ? (
+                  <ul className="space-y-2.5">
+                    {BASELINE_SERVICES.map((b) => (
+                      <li key={b.key} className="flex items-start gap-3 text-sm rounded-lg border border-border/60 bg-background/30 px-3 py-2.5">
+                        <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-electric" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium">{b.name}</div>
+                          <div className="text-[11px] text-muted-foreground mt-0.5">{b.detail}</div>
+                        </div>
+                        <span className="text-xs font-semibold uppercase tracking-wide whitespace-nowrap text-electric">
+                          Recommended
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <ul className="space-y-2.5">
+                    {results.map(({ svc, result }) => (
+                      <li key={svc.key} className="flex items-start gap-3 text-sm rounded-lg border border-border/60 bg-background/30 px-3 py-2.5">
+                        {checked
+                          ? <CheckCircle2 className={`h-4 w-4 mt-0.5 shrink-0 ${result.label === "Due Now" ? "text-neon" : "text-electric"}`} />
+                          : <span className="mt-0.5">{svc.icon}</span>}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium">{svc.name}</div>
+                          {checked && (
+                            <div className="text-[11px] text-muted-foreground mt-0.5">{result.detail}</div>
+                          )}
+                        </div>
+                        <span className={`text-xs font-semibold uppercase tracking-wide whitespace-nowrap ${checked ? statusStyle(result.label) : "text-muted-foreground"}`}>
+                          {checked ? result.label : "—"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
 
               {checked && (
                 <>
                   <div className="mt-5 rounded-lg border border-border/60 bg-background/30 px-3 py-2.5 text-[11px] text-muted-foreground leading-relaxed">
-                    {hasHistory
+                    {isBaselineReport
+                      ? "We're not guessing what your vehicle needs. Start with a baseline inspection so every future recommendation is based on real condition data."
+                      : isPersonalized
                       ? "Forecast based on the details you provided. A technician inspection confirms exact wear and condition."
                       : "These are planning suggestions based on typical intervals — not a diagnosis. A quick inspection at our shop will confirm what's actually needed."}
                   </div>
+
                   <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Button variant="neon" size="lg" className="w-full gap-2">
                       <Calendar className="h-4 w-4" /> Book Appointment
