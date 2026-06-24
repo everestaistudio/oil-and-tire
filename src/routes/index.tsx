@@ -34,17 +34,21 @@ function Home() {
       <main className="pb-28 lg:pb-0">
         <Hero />
         <Services />
+        <CostEstimator />
         <Reviews />
         <HealthChecker />
         <TireFinder />
+        <Locations />
         <Family />
         <PromoBooking />
         <Footer />
       </main>
+      <EmergencyCTA />
       <MobileBar />
     </div>
   );
 }
+
 
 /* ---------------- Header ---------------- */
 function Header() {
