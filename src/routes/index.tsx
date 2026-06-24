@@ -1045,7 +1045,7 @@ function MobileBar() {
     <div className="lg:hidden fixed bottom-0 inset-x-0 z-50 border-t border-border bg-background/95 backdrop-blur-xl">
       <div className="grid grid-cols-4 gap-1 px-2 pt-2 pb-[max(env(safe-area-inset-bottom),0.5rem)]">
         <BarBtn icon={<Phone className="h-4 w-4" />} label="Call" href="tel:5195375703" />
-        <BarBtn icon={<MapPin className="h-4 w-4" />} label="Locations" href="#footer" />
+        <BarBtn icon={<MapPin className="h-4 w-4" />} label="Locations" href="#locations" />
         <a href="#book" className="flex flex-col items-center justify-center gap-1 rounded-xl py-2 px-1 bg-neon text-neon-foreground glow-neon -translate-y-3 shadow-lg">
           <Calendar className="h-5 w-5" />
           <span className="text-[10px] font-bold uppercase tracking-wide">Book</span>
