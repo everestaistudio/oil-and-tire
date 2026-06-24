@@ -356,6 +356,7 @@ function statusInspectionOnly(svc: ServiceDef): StatusResult {
 }
 
 type HistoryMode = "recent" | "some" | "new" | "unsure";
+type RecordsLevel = "" | "yes" | "partial" | "none";
 
 interface HistoryState {
   oilKm: string; oilDate: string;
@@ -365,6 +366,7 @@ interface HistoryState {
   purchaseDate: string;
   purchaseKm: string;
   hasCarfax: boolean;
+  records: RecordsLevel;
 }
 const EMPTY_HISTORY: HistoryState = {
   oilKm: "", oilDate: "",
@@ -374,7 +376,22 @@ const EMPTY_HISTORY: HistoryState = {
   purchaseDate: "",
   purchaseKm: "",
   hasCarfax: false,
+  records: "",
 };
+
+interface BaselineService {
+  key: string;
+  name: string;
+  detail: string;
+  icon: React.ReactNode;
+}
+const BASELINE_SERVICES: BaselineService[] = [
+  { key: "mpi",     name: "Multi-Point Inspection",   detail: "Comprehensive vehicle walk-around to establish current condition.", icon: <Wrench           className="h-4 w-4 text-electric shrink-0" /> },
+  { key: "brakes",  name: "Brake Inspection",         detail: "Measure pad thickness, rotor condition and brake fluid quality.",   icon: <Gauge            className="h-4 w-4 text-electric shrink-0" /> },
+  { key: "fluids",  name: "Fluid Condition Check",    detail: "Test engine oil, coolant, transmission and brake fluid condition.", icon: <Activity         className="h-4 w-4 text-electric shrink-0" /> },
+  { key: "tires",   name: "Tire Assessment",          detail: "Tread depth, wear pattern, age and pressure check on all tires.",   icon: <Disc3            className="h-4 w-4 text-electric shrink-0" /> },
+  { key: "battery", name: "Battery Health Check",     detail: "Load test the battery and inspect charging system performance.",    icon: <BatteryCharging  className="h-4 w-4 text-electric shrink-0" /> },
+];
 
 
 function HealthChecker() {
