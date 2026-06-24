@@ -264,14 +264,28 @@ const SERVICES: ServiceDef[] = [
   { key: "mpi",      name: "Multi-Point Inspection",intervalKm: 20000, intervalMonths: 12, tracksMileage: false, icon: <Wrench   className="h-4 w-4 text-electric shrink-0" /> },
 ];
 
-type StatusLabel = "Due Now" | "Due Soon" | "Upcoming" | "Recently Done";
+type StatusLabel =
+  | "Recently Serviced"
+  | "Due Soon"
+  | "Due Now"
+  | "Recommended"
+  | "Inspection Suggested"
+  | "Upcoming";
+
+interface StatusResult {
+  label: StatusLabel;
+  detail: string;
+  confidence: "personalized" | "estimated" | "suggested";
+}
 
 function statusStyle(label: StatusLabel) {
   switch (label) {
-    case "Due Now":      return "text-neon";
-    case "Due Soon":     return "text-electric";
-    case "Recently Done":return "text-muted-foreground";
-    default:             return "text-muted-foreground";
+    case "Due Now":             return "text-neon";
+    case "Due Soon":            return "text-electric";
+    case "Recommended":         return "text-electric";
+    case "Inspection Suggested":return "text-electric";
+    case "Recently Serviced":   return "text-muted-foreground";
+    default:                    return "text-muted-foreground";
   }
 }
 
@@ -283,48 +297,85 @@ function monthsBetween(iso: string): number | null {
   return (now.getFullYear() - then.getFullYear()) * 12 + (now.getMonth() - then.getMonth());
 }
 
+function fmtKm(n: number) {
+  return `${Math.max(0, Math.round(n)).toLocaleString()} km`;
+}
+
 function statusFromKnown(
   svc: ServiceDef,
   currentKm: number,
   lastKm: number | null,
   lastDateIso: string,
-): StatusLabel {
+): StatusResult {
   const months = monthsBetween(lastDateIso);
-  let kmRatio = -Infinity;
-  let monthRatio = -Infinity;
-  if (svc.tracksMileage && lastKm != null && currentKm >= lastKm) {
-    kmRatio = (currentKm - lastKm) / svc.intervalKm;
+  const kmSince = svc.tracksMileage && lastKm != null && currentKm >= lastKm ? currentKm - lastKm : null;
+  const kmRemaining = kmSince != null ? svc.intervalKm - kmSince : null;
+  const monthsRemaining = months != null && months >= 0 ? svc.intervalMonths - months : null;
+
+  if (kmRemaining == null && monthsRemaining == null) {
+    return statusFromAverage(svc, currentKm);
   }
-  if (months != null && months >= 0) {
-    monthRatio = months / svc.intervalMonths;
+
+  // Use whichever is more urgent (smaller remaining ratio)
+  const kmRatio = kmRemaining != null ? kmRemaining / svc.intervalKm : 1;
+  const monthRatio = monthsRemaining != null ? monthsRemaining / svc.intervalMonths : 1;
+  const useKm = kmRatio <= monthRatio && kmRemaining != null;
+
+  if (useKm && kmRemaining != null) {
+    if (kmRemaining <= 0)      return { label: "Due Now",   detail: `Overdue by ${fmtKm(-kmRemaining)}`,  confidence: "personalized" };
+    if (kmRemaining <= 1500)   return { label: "Due Soon",  detail: `Due in ${fmtKm(kmRemaining)}`,        confidence: "personalized" };
+    if (kmRemaining <= svc.intervalKm * 0.5)
+                               return { label: "Upcoming",  detail: `Due in ${fmtKm(kmRemaining)}`,        confidence: "personalized" };
+    return { label: "Recently Serviced", detail: `${fmtKm(kmSince!)} since last service`, confidence: "personalized" };
   }
-  const ratio = Math.max(kmRatio, monthRatio);
-  if (ratio === -Infinity) return statusFromAverage(svc, currentKm);
-  if (ratio >= 1)    return "Due Now";
-  if (ratio >= 0.85) return "Due Soon";
-  if (ratio >= 0.4)  return "Upcoming";
-  return "Recently Done";
+
+  if (monthsRemaining != null) {
+    if (monthsRemaining <= 0)  return { label: "Due Now",   detail: `Overdue by ${-monthsRemaining} mo`,   confidence: "personalized" };
+    if (monthsRemaining <= 2)  return { label: "Due Soon",  detail: `Due in ${monthsRemaining} months`,    confidence: "personalized" };
+    if (monthsRemaining <= svc.intervalMonths * 0.5)
+                               return { label: "Upcoming",  detail: `Due in ${monthsRemaining} months`,    confidence: "personalized" };
+    return { label: "Recently Serviced", detail: `Serviced ${months} months ago`, confidence: "personalized" };
+  }
+
+  return statusFromAverage(svc, currentKm);
 }
 
-function statusFromAverage(svc: ServiceDef, currentKm: number): StatusLabel {
+function statusFromAverage(svc: ServiceDef, currentKm: number): StatusResult {
   const remaining = svc.intervalKm - (currentKm % svc.intervalKm);
-  if (remaining <= 1000) return "Due Now";
-  if (remaining <= 3000) return "Due Soon";
-  return "Upcoming";
+  if (remaining <= 1000) return { label: "Recommended",          detail: `Typically due around ${fmtKm(currentKm)}`, confidence: "estimated" };
+  if (remaining <= 3000) return { label: "Due Soon",             detail: `Typical interval every ${fmtKm(svc.intervalKm)}`, confidence: "estimated" };
+  return                   { label: "Upcoming",                  detail: `Plan within ~${fmtKm(remaining)}`,         confidence: "estimated" };
 }
+
+function statusInspectionOnly(svc: ServiceDef): StatusResult {
+  return {
+    label: "Inspection Suggested",
+    detail: `Recommend a baseline check (typical interval ${fmtKm(svc.intervalKm)})`,
+    confidence: "suggested",
+  };
+}
+
+type HistoryMode = "recent" | "some" | "new" | "unsure";
 
 interface HistoryState {
   oilKm: string; oilDate: string;
   rotationKm: string; rotationDate: string;
   brakesDate: string;
   fluidsDate: string;
+  purchaseDate: string;
+  purchaseKm: string;
+  hasCarfax: boolean;
 }
 const EMPTY_HISTORY: HistoryState = {
   oilKm: "", oilDate: "",
   rotationKm: "", rotationDate: "",
   brakesDate: "",
   fluidsDate: "",
+  purchaseDate: "",
+  purchaseKm: "",
+  hasCarfax: false,
 };
+
 
 function HealthChecker() {
   const [make, setMake] = useState("");
