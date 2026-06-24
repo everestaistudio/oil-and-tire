@@ -222,11 +222,26 @@ function Reviews() {
 }
 
 /* ---------------- Health Checker ---------------- */
-const MAKES = [
-  "Toyota", "Honda", "Ford", "Chevrolet", "Hyundai", "Kia",
-  "Nissan", "Subaru", "BMW", "Mercedes-Benz", "Audi", "Volkswagen",
-  "Mazda", "Jeep", "RAM", "GMC",
-];
+const MODELS_BY_MAKE: Record<string, string[]> = {
+  Toyota: ["Corolla", "Camry", "RAV4", "Highlander", "Tacoma", "Tundra", "Prius", "4Runner", "Sienna"],
+  Honda: ["Civic", "Accord", "CR-V", "HR-V", "Pilot", "Odyssey", "Ridgeline", "Passport"],
+  Ford: ["F-150", "Escape", "Edge", "Explorer", "Mustang", "Bronco", "Maverick", "Ranger"],
+  Chevrolet: ["Silverado", "Equinox", "Trax", "Traverse", "Malibu", "Tahoe", "Suburban", "Colorado"],
+  Hyundai: ["Elantra", "Sonata", "Tucson", "Santa Fe", "Kona", "Palisade", "Venue"],
+  Kia: ["Forte", "K5", "Sportage", "Sorento", "Telluride", "Soul", "Seltos"],
+  Nissan: ["Sentra", "Altima", "Rogue", "Murano", "Pathfinder", "Frontier", "Titan", "Kicks"],
+  Subaru: ["Impreza", "Legacy", "Outback", "Forester", "Crosstrek", "Ascent", "WRX"],
+  BMW: ["3 Series", "5 Series", "X1", "X3", "X5", "X7", "M3"],
+  "Mercedes-Benz": ["A-Class", "C-Class", "E-Class", "S-Class", "GLA", "GLC", "GLE"],
+  Audi: ["A3", "A4", "A6", "Q3", "Q5", "Q7", "e-tron"],
+  Volkswagen: ["Jetta", "Passat", "Golf", "Tiguan", "Atlas", "Taos", "ID.4"],
+  Mazda: ["Mazda3", "Mazda6", "CX-3", "CX-30", "CX-5", "CX-9", "MX-5 Miata"],
+  Jeep: ["Wrangler", "Grand Cherokee", "Cherokee", "Compass", "Renegade", "Gladiator"],
+  RAM: ["1500", "2500", "3500", "ProMaster"],
+  GMC: ["Sierra 1500", "Canyon", "Terrain", "Acadia", "Yukon"],
+};
+const MAKES = Object.keys(MODELS_BY_MAKE);
+
 
 const YEARS = Array.from({ length: 17 }, (_, i) => String(2010 + i));
 
