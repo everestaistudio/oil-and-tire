@@ -750,12 +750,7 @@ function HistoryOption({
   );
 }
 
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
+
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
