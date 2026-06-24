@@ -434,45 +434,67 @@ function HealthChecker() {
     }, 1400);
   };
 
-  const hasHistory = historyMode === "recent" || historyMode === "some";
+  // Effective records level: explicit for "new"; implicit for the other modes.
+  const recordsLevel: RecordsLevel =
+    historyMode === "new"    ? history.records :
+    historyMode === "recent" ? "yes" :
+    historyMode === "some"   ? "partial" :
+    "none";
+
+  // "Just bought + no records" → no forecast, just a baseline report.
+  const isBaselineReport = historyMode === "new" && history.records === "none";
+  // Anything with usable history (recent / some / new+yes / new+partial) → personalized forecast.
+  const isPersonalized =
+    historyMode === "recent" ||
+    historyMode === "some"   ||
+    (historyMode === "new" && (history.records === "yes" || history.records === "partial"));
+
+  const canGenerate = (() => {
+    if (!historyMode) return false;
+    if (historyMode === "new") {
+      if (!history.purchaseDate || !history.records) return false;
+      if (history.records === "yes" && !history.oilKm && !history.oilDate) return false;
+    }
+    return true;
+  })();
 
   const results = SERVICES.map((s) => {
     let result: StatusResult;
-    if (historyMode === "recent" || historyMode === "some") {
+    if (isPersonalized) {
       if (s.key === "oil")           result = statusFromKnown(s, numMileage, Number(history.oilKm) || null, history.oilDate);
       else if (s.key === "rotation") result = statusFromKnown(s, numMileage, Number(history.rotationKm) || null, history.rotationDate);
       else if (s.key === "brakes")   result = statusFromKnown(s, numMileage, null, history.brakesDate);
       else if (s.key === "fluids")   result = statusFromKnown(s, numMileage, null, history.fluidsDate);
-      else                            result = statusFromAverage(s, numMileage);
-    } else if (historyMode === "new") {
-      // Just bought — recommend a baseline inspection on everything
-      result = statusInspectionOnly(s);
-    } else {
-      // unsure or null — estimated only
+      else                            result = statusInspectionOnly(s);
+    } else if (historyMode === "unsure") {
       result = statusFromAverage(s, numMileage);
+    } else {
+      result = statusInspectionOnly(s);
     }
     return { svc: s, result };
   });
 
-  const reportTitle = hasHistory ? "Personalized Service Forecast" : "Maintenance Planning Report";
+  const reportTitle =
+    isBaselineReport ? "New Vehicle Baseline Report" :
+    isPersonalized   ? "Personalized Maintenance Forecast" :
+    "Maintenance Planning Report";
+
   const reportSubtitle = (() => {
-    switch (historyMode) {
-      case "recent": return "Based on the service history you provided";
-      case "some":   return "Based on the partial records you provided";
-      case "new":    return "Baseline plan for a newly acquired vehicle";
-      case "unsure": return "Estimated using manufacturer-typical intervals";
-      default:       return "";
-    }
+    if (isBaselineReport) return "Because previous maintenance history is unknown, we recommend establishing a service baseline.";
+    if (historyMode === "recent") return "Based on the service history you provided";
+    if (historyMode === "some")   return "Based on the partial records you provided";
+    if (historyMode === "new" && history.records === "yes")     return "Based on the records you received with the vehicle";
+    if (historyMode === "new" && history.records === "partial") return "Based on the partial records you received with the vehicle";
+    if (historyMode === "unsure") return "Estimated using manufacturer-typical intervals";
+    return "";
   })();
+
   const confidenceBadge = (() => {
-    switch (historyMode) {
-      case "recent": return "Personalized";
-      case "some":   return "Partial history";
-      case "new":    return "Baseline plan";
-      case "unsure": return "Estimate";
-      default:       return "Estimate";
-    }
+    if (isBaselineReport) return "Baseline report";
+    if (isPersonalized)   return recordsLevel === "partial" ? "Partial history" : "Personalized";
+    return "Estimate";
   })();
+
 
   return (
     <section className="py-16 sm:py-24" id="health-checker">
